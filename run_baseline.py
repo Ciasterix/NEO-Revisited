@@ -29,20 +29,19 @@ def single_test():
 
 if __name__ == "__main__":
     tasks_list = [
-        # (benchmarks.Cmp, 4), # small problem for debug only
         (benchmarks.Cmp, 6),
-        # (benchmarks.Cmp, 8), # takes too long and 0.05 success rate in paper
+        (benchmarks.Cmp, 8),
         (benchmarks.Maj, 6),
-        # (benchmarks.Maj, 8), # takes too long and 0.05 success rate in paper
+        (benchmarks.Maj, 8),
         (benchmarks.Mux, 6),
-        # (benchmarks.Par, 5), #  0.05 success rate in paper
+        (benchmarks.Par, 5),
     ]
     benchmarks.test_benchmarks(
         benchmarks.eaBreakSuccessful,
         tasks_list,
-        num_runs=5,
-        pop_size=100,
-        num_gen=20,
+        num_runs=20,
+        pop_size=1000,
+        num_gen=200,
         seed=0,
         verb=False
     )
