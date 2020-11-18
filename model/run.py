@@ -29,7 +29,7 @@ if __name__ == "__main__":
         sample_hidden.shape))
 
     # Attention
-    attention_layer = Attention(10)
+    attention_layer = Attention()
     attention_result, attention_weights = attention_layer(sample_hidden,
                                                           sample_output)
 

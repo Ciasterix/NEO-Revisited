@@ -16,7 +16,7 @@ class Decoder(tf.keras.Model):
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
-        self.attention = Attention(self.dec_units)
+        self.attention = Attention()
 
     def call(self, x, hidden, enc_output):
         # enc_output shape == (batch_size, max_length, hidden_size)
