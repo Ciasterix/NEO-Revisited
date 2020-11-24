@@ -25,8 +25,8 @@ if __name__ == "__main__":
     BATCH_SIZE = 64
     vocab_inp_size = 32
     vocab_tar_size = 32
-    embedding_dim = 256
-    units = 1024
+    embedding_dim = 64
+    units = 128
 
     # Encoder
     encoder = Encoder(vocab_inp_size, embedding_dim, units, BATCH_SIZE)
