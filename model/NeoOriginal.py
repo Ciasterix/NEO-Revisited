@@ -70,10 +70,8 @@ class NeoOriginal:
     def loss_function(self, real, pred):
         mask = tf.math.logical_not(tf.math.equal(real, 0))
         loss_ = self.loss_object(real, pred)
-
         mask = tf.cast(mask, dtype=loss_.dtype)
         loss_ *= mask
-
         return tf.reduce_mean(loss_)
 
     def __train_autoencoder(self):
@@ -99,10 +97,16 @@ class NeoOriginal:
             if self.verbose:
                 print('Epoch {} Loss {:.4f}'.format(
                     epoch + 1, total_loss / self.steps_per_epoch))
-                print('Time for 1 epoch {} sec\n'.format(time.time() - start))
+                print('Time for epoch {} sec\n'.format(time.time() - start))
 
         # decrease number of epoch, but don't go below self.min_epochs
         self.epochs = max(self.epochs - self.epoch_decay, self.min_epochs)
 
     def breed(self):
         self.__train_autoencoder()
+
+
+if __name__ == "__main__":
+    neo = NeoOriginal(epochs=15)
+    neo.breed()
+    neo.breed()  # second call to check epoch decay
