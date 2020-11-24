@@ -10,8 +10,9 @@ class Dataset:
         while i < steps_per_epoch:
             i += 1
             example_input_batch = tf.random.uniform(shape=(64, 16), minval=0,
-                                                    maxval=31,
+                                                    maxval=2,
                                                     dtype=tf.int64)
-            example_target_batch = tf.random.uniform(shape=(64, 11), minval=0,
-                                                     maxval=31, dtype=tf.int64)
+            example_target_batch = example_input_batch[:, :11]
+            # example_target_batch = tf.random.uniform(shape=(64, 11), minval=0,
+            #                                          maxval=31, dtype=tf.int64)
             yield example_input_batch, example_target_batch

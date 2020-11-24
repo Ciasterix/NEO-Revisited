@@ -14,14 +14,20 @@ class Encoder(tf.keras.Model):
 
     def call(self, x, hidden):
         x = self.embedding(x)
-        output, hidden_state, cell_state = self.lstm(x)#, initial_state=hidden)
+        output, hidden_state, cell_state = self.lstm(x, initial_state=hidden)
         return output, hidden_state, cell_state
 
-    def initialize_hidden_state(self):
-        return tf.zeros((self.batch_sz, self.enc_units))
+    def initialize_hidden_state(self, batch_sz=None):
+        if batch_sz is not None:
+            return tf.zeros((batch_sz, self.enc_units))
+        else:
+            return tf.zeros((self.batch_sz, self.enc_units))
 
-    def initialize_cell_state(self):
-        return tf.zeros((self.batch_sz, self.enc_units))
+    def initialize_cell_state(self, batch_sz=None):
+        if batch_sz is not None:
+            return tf.zeros((batch_sz, self.enc_units))
+        else:
+            return tf.zeros((self.batch_sz, self.enc_units))
 
 
 if __name__ == "__main__":
