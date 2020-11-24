@@ -21,11 +21,14 @@ if __name__ == "__main__":
     print(example_input_batch.shape, example_target_batch.shape)
     # sample input
     sample_hidden = encoder.initialize_hidden_state()
-    sample_output, sample_hidden = encoder(example_input_batch, sample_hidden)
+    sample_cell = encoder.initialize_cell_state()
+    sample_output, sample_hidden, cell_hidden = encoder(example_input_batch, [sample_hidden, sample_cell])
     print(
         'Encoder output shape: (batch size, sequence length, units) {}'.format(
             sample_output.shape))
     print('Encoder Hidden state shape: (batch size, units) {}'.format(
+        sample_hidden.shape))
+    print('Encoder Cell state shape: (batch size, units) {}'.format(
         sample_hidden.shape))
 
     # Attention
@@ -41,7 +44,7 @@ if __name__ == "__main__":
     # Decoder
     decoder = Decoder(vocab_tar_size, embedding_dim, units, BATCH_SIZE)
 
-    sample_decoder_output, _, _ = decoder(tf.random.uniform((BATCH_SIZE, 1)),
+    sample_decoder_output, _, _, _ = decoder(tf.random.uniform((BATCH_SIZE, 1)),
                                           sample_hidden, sample_output)
 
     print('Decoder output shape: (batch_size, vocab size) {}'.format(
