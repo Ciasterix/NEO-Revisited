@@ -85,10 +85,11 @@ if __name__ == "__main__":
 
     random.seed(0)
 
+    benchmarks.standard_creator()
+
     pset = benchmarks.standard_boolean_pset(IN_PARAM)
     toolbox = benchmarks.standard_toolbox(pset)
     ev = benchmarks.Maj(pset, IN_PARAM)
-    toolbox.register("evaluate", ev)
     toolbox.register("evaluate", ev)
 
     pop = toolbox.population(n=POP_SIZE)
