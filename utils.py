@@ -16,8 +16,8 @@ class TreeTokenizer:
 
     def _tokenize(self, string_tree):
         tokens_string = string_tree.translate(self.trans)
-        tokens = list(
-            tokenize.tokenize(io.BytesIO(tokens_string.encode()).readline))
+        code = io.BytesIO(tokens_string.encode())
+        tokens = list(tokenize.tokenize(code.readline))
         tokens = [t.string for t in tokens if t.string in self.vocabulary]
         return tokens
 
@@ -37,12 +37,8 @@ class TreeTokenizer:
                 expr.append(self.primitives[tn])
         return expr
 
-    def validate_program(self, program):
-        try:
-            eval(program)
-        except:
-            return False
-        return True
+    def validate_expression(self, tokens, expr):
+        return len(tokens) == len(self._tokenize(expr))
 
 
 if __name__ == "__main__":
@@ -57,8 +53,8 @@ if __name__ == "__main__":
     print("id2tokens:")
     print(tokenizer.id2tokens)
 
-    s2 = 'nand(nand(IN3, IN1), or_(nand(and_(IN2, IN0),\
-     or_(IN2, IN3)), nand(IN4, nand(IN5, 0))))'
+    s2 = 'nand(nand(IN3, IN1), or_(nand(and_(IN2, IN0), '\
+         + 'or_(IN2, IN3)), nand(IN4, nand(IN5, 0))))'
 
     print("\nTokenizing string")
     print(s2)
@@ -75,3 +71,19 @@ if __name__ == "__main__":
     print("Tree:")
     tree = gp.PrimitiveTree(expr)
     print(str(tree))
+
+    print("\nValidate expression:")
+    print(tokenizer.validate_expression(tokens, str(tree)))
+
+    print("\n--------------- INVALID EXAMPLE -----------")
+    invalid_tokens = tokens[1:]
+
+    print("\nnReproducing Invalid Tree")
+    invalid_expr = tokenizer.reproduce_expression(invalid_tokens)
+    print("Expression")
+    print(invalid_expr)
+    print("Tree:")
+    invalid_tree = gp.PrimitiveTree(invalid_expr)
+    print(str(invalid_tree))
+    print("Validate invalid expression:")
+    print(tokenizer.validate_expression(invalid_tokens, str(invalid_tree)))
