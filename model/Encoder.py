@@ -31,18 +31,18 @@ class Encoder(tf.keras.Model):
 
 
 if __name__ == "__main__":
-    BATCH_SIZE = 64
+    BATCH_SIZE = 256
     vocab_inp_size = 32
     vocab_tar_size = 32
-    embedding_dim = 256
-    units = 1024
+    embedding_dim = 64
+    units = 128
 
     # Encoder
     encoder = Encoder(vocab_inp_size, embedding_dim, units, BATCH_SIZE)
 
-    example_input_batch = tf.random.uniform(shape=(64, 16), minval=0, maxval=31,
+    example_input_batch = tf.random.uniform(shape=(BATCH_SIZE, 16), minval=0, maxval=31,
                                             dtype=tf.int64)
-    example_target_batch = tf.random.uniform(shape=(64, 11), minval=0,
+    example_target_batch = tf.random.uniform(shape=(BATCH_SIZE, 11), minval=0,
                                              maxval=31, dtype=tf.int64)
     print(example_input_batch.shape, example_target_batch.shape)
     # sample input

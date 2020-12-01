@@ -1,15 +1,15 @@
-import random
 import operator
-import numpy as np
-from itertools import product
-from tqdm import trange
+import random
 import time
+from itertools import product
 
+import numpy as np
 from deap import algorithms
-from deap import creator
-from deap import tools
 from deap import base
+from deap import creator
 from deap import gp
+from deap import tools
+from tqdm import trange
 
 
 class Mux:
@@ -175,8 +175,8 @@ def standard_toolbox(primitives_set):
     toolbox.register("expr_mut", gp.genGrow, min_=0, max_=2)
     toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=primitives_set)
 
-    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=30))
-    toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=30))
+    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=5))
+    toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=5))
 
     return toolbox
 

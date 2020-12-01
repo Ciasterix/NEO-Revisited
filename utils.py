@@ -31,9 +31,11 @@ class TreeTokenizer:
         return tokens
 
     def tokenize_tree(self, string_tree):
-        if len(string_tree) > self.max_size - 2:
-            raise ValueError("Tree size bigger than tokenizer's max_size")
         tokens = self._tokenize(string_tree)
+        if len(tokens) > self.max_size - 2:
+            print(string_tree)
+            print(len(tokens))
+            raise ValueError("Tree size bigger than tokenizer's max_size")
         tokens = ['<start>'] + tokens + ['<end>']
         ids_only = [self.tokens2id[t] for t in tokens]
         self.__pad(ids_only)

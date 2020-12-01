@@ -3,10 +3,11 @@ import random
 from deap import tools
 
 import benchmarks
+from model.NeoOriginal import NeoOriginal
 
 
 def memetic_algorithm(population, toolbox, ngen, model, stats=None,
-              halloffame=None, verbose=__debug__):
+                      halloffame=None, verbose=__debug__):
     """This function is a modified version of eaSimple from deap library
     :param population: A list of individuals.
     :param toolbox: A :class:`~deap.base.Toolbox` that contains the evolution
@@ -39,25 +40,29 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     if verbose:
         print(logbook.stream)
 
-    epochs = 200
+    # epochs = 200
 
     # Begin the generational process
     for gen in range(1, ngen + 1):
-        max((epochs - 1, 10))
+        # max((epochs - 1, 10))
         # Select the next generation individuals
         offspring = toolbox.select(population, len(population))
+        model.population.update(offspring)
 
         # Training neural model
-        model.update(offspring, epochs)
+        model.update()
 
         # Breeding neural model
-        model.breed(offspring)
+        offspring = model.breed()
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+        # try:
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
+        # except:
+        #     print(ind)
 
         # Update the hall of fame with the generated individuals
         if halloffame is not None:
@@ -79,7 +84,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
 
 if __name__ == "__main__":
-    POP_SIZE = 1000
+    POP_SIZE = 64
     NUM_GEN = 200
     IN_PARAM = 6
 
@@ -95,5 +100,19 @@ if __name__ == "__main__":
     pop = toolbox.population(n=POP_SIZE)
     hof = tools.HallOfFame(1)
     stats = benchmarks.standard_statistics()
-
-    # memetic_algorithm(pop, toolbox, NUM_GEN, naural_model, stats, hof)
+    neural_model = NeoOriginal(
+        pset,
+        batch_size=64,
+        max_size=32,
+        vocab_inp_size=15,
+        vocab_tar_size=15,
+        embedding_dim=64,
+        units=128,
+        hidden_size=128,
+        alpha=0.8,
+        epochs=200,
+        epoch_decay=1,
+        min_epochs=10,
+        verbose=True
+    )
+    memetic_algorithm(pop, toolbox, NUM_GEN, neural_model, stats, hof)

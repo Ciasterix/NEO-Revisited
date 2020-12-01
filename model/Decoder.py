@@ -26,6 +26,7 @@ class Decoder(tf.keras.Model):
         x = self.embedding(x)
 
         # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
+        # print(context_vector.shape, x.shape)
         x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
 
         # passing the concatenated vector to the GRU
