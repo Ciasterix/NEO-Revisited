@@ -5,14 +5,23 @@ import tokenize
 
 class TreeTokenizer:
 
-    def __init__(self, pset):
+    def __init__(self, pset, max_size):
         self.pset = pset
+        self.max_size = max_size
+
         self.terminals = {t.name: t for t in pset.terminals[pset.ret]}
         self.primitives = {p.name: p for p in pset.primitives[pset.ret]}
-        self.vocabulary = [*self.terminals.keys()] + [*self.primitives.keys()]
+
+        self.vocabulary = ['<pad>', '<start>', '<end>'] +\
+                          [*self.terminals.keys()] + [*self.primitives.keys()]
         self.tokens2id = {t: i for i, t in enumerate(self.vocabulary)}
         self.id2tokens = {i: t for t, i in self.tokens2id.items()}
+
+        # TODO check if this trans can be deleted
         self.trans = str.maketrans({'(': ' ', ')': ' ', ',': ' '})
+
+    def __pad(self, _list):
+        _list.extend([0] * (self.max_size - len(_list)))
 
     def _tokenize(self, string_tree):
         tokens_string = string_tree.translate(self.trans)
@@ -22,19 +31,30 @@ class TreeTokenizer:
         return tokens
 
     def tokenize_tree(self, string_tree):
+        if len(string_tree) > self.max_size - 2:
+            raise ValueError("Tree size bigger than tokenizer's max_size")
         tokens = self._tokenize(string_tree)
-        ids = [self.tokens2id[t] for t in tokens]
-        return ids
+        tokens = ['<start>'] + tokens + ['<end>']
+        ids_only = [self.tokens2id[t] for t in tokens]
+        self.__pad(ids_only)
+        return ids_only
 
     def reproduce_expression(self, tokens):
         tokens_names = [self.id2tokens[t] for t in tokens]
-        print('tokens_names:', tokens_names)
         expr = []
-        for tn in tokens_names:
-            if tn in self.terminals:
+        if not tokens_names[0] == '<start>':
+            raise ValueError(
+                "First token is not '<start>' but " + tokens_names[0] )
+
+        for tn in tokens_names[1:]:
+            if tn == '<end>':
+                break
+            elif tn in self.terminals:
                 expr.append(self.terminals[tn])
-            if tn in self.primitives:
+            elif tn in self.primitives:
                 expr.append(self.primitives[tn])
+            else:
+                raise ValueError("Wrong token:" + str(tn))
         return expr
 
     def validate_expression(self, tokens, expr):
@@ -46,7 +66,7 @@ if __name__ == "__main__":
     from deap import gp
 
     pset = benchmarks.standard_boolean_pset(num_in=6)
-    tokenizer = TreeTokenizer(pset)
+    tokenizer = TreeTokenizer(pset, 100)
     print("Setup tokenizer:")
     print("tokens2id:")
     print(tokenizer.tokens2id)
