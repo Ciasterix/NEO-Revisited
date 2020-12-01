@@ -58,7 +58,6 @@ class NeoOriginal:
             dec_hidden = enc_hidden
             dec_input = tf.expand_dims([0] * self.batch_size,
                                        1)  # TODO: Change [0] to start token
-            print(dec_input.shape)
             # Teacher forcing - feeding the target as the next input
             for t in range(1, targ.shape[1]):
                 # passing enc_output to the decoder
@@ -142,12 +141,11 @@ class NeoOriginal:
         enc_cell = self.enc.initialize_cell_state(batch_sz=1)
         offspring = candidate
         eta = 0
+        enc_output, enc_hidden, enc_cell = self.enc(
+            offspring, [enc_hidden, enc_cell])
         while True:
             eta += 1
             with tf.GradientTape() as tape:
-                enc_output, enc_hidden, enc_cell = self.enc(
-                    offspring, [enc_hidden, enc_cell])
-
                 surrogate_output = self.surrogate(enc_hidden)
                 gradients = self.surrogate_breed(surrogate_output, enc_hidden,
                                                  tape)
