@@ -176,7 +176,7 @@ class NeoOriginal:
                 data_generator):
             # Take one sample from batch
             print(inp[:1].shape)
-            new = neo._gen_offspring(inp[:1])
+            new = self._gen_offspring(inp[:1])
             print(new.shape)
 
 
