@@ -169,17 +169,20 @@ class NeoOriginal:
         self.__train()
 
     def breed(self):
-        pass
+        # Simulate population
+        dataset = Dataset()
+        data_generator = dataset(1)
+        for (batch, (inp, targ, targ_surrogate)) in enumerate(
+                data_generator):
+            # Take one sample from batch
+            print(inp[:1].shape)
+            new = neo._gen_offspring(inp[:1])
+            print(new.shape)
 
 
 if __name__ == "__main__":
     neo = NeoOriginal(epochs=15)
     neo.model_update()  # second call to check epoch decay
-    dataset = Dataset()
-    data_generator = dataset(1)
-    for (batch, (inp, targ, targ_surrogate)) in enumerate(
-            data_generator):
-        # Take one sample from batch
-        print(inp[:1].shape)
-        new = neo._gen_offspring(inp[:1])
-        print(new.shape)
+    neo.breed()
+
+
