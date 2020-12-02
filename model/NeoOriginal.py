@@ -45,7 +45,7 @@ class NeoOriginal:
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=True, reduction='none')
 
-    # @tf.function
+    @tf.function
     def train_step(self, inp, targ, targ_surrogate, enc_hidden,
                    enc_cell):
         autoencoder_loss = 0
@@ -58,10 +58,11 @@ class NeoOriginal:
                                                           surrogate_output)
 
             dec_hidden = enc_hidden
-            dec_input = tf.expand_dims([0] * self.batch_size,
-                                       1)  # TODO: Change [0] to start token
+            dec_input = tf.expand_dims([1] * self.batch_size,
+                                       # [1] - starting token
+                                       1)
             # Teacher forcing - feeding the target as the next input
-            for t in range(1, targ.shape[1]):
+            for t in range(1, self.max_size):
                 # print(t)
                 # passing enc_output to the decoder
                 predictions, dec_hidden, _, _ = self.dec(
@@ -73,9 +74,10 @@ class NeoOriginal:
                 # using teacher forcing
                 dec_input = tf.expand_dims(targ[:, t], 1)
             loss = autoencoder_loss + self.alpha * surrogate_loss
-        print("AE loss:", autoencoder_loss.numpy())
-        print("Surrogate loss:", surrogate_loss.numpy())
-
+        # print("-" * 80)
+        # print("AE loss:", autoencoder_loss.numpy())
+        # print("Surrogate loss:", surrogate_loss.numpy())
+        # print(targ.shape[1])
         batch_loss = (autoencoder_loss / int(targ.shape[1]))
         gradients, variables = self.backward(loss, tape)
         self.optimize(gradients, variables)
@@ -147,34 +149,40 @@ class NeoOriginal:
         enc_cell = self.enc.initialize_cell_state(batch_sz=1)
         child = candidate
         # eta = 0
-        with tf.GradientTape() as tape:
-            enc_output, enc_hidden, enc_cell = self.enc(
-                child, [enc_hidden, enc_cell])
-            for eta in range(1, 101):
+        print("candidate", candidate)
+        enc_output, enc_hidden, enc_cell = self.enc(
+            child, [enc_hidden, enc_cell])
+        for eta in range(1, 101):
+            print("eta", eta)
+            # tape.watch(enc_hidden)
+            with tf.GradientTape(watch_accessed_variables=False) as tape:
+                tape.watch(enc_hidden)
                 surrogate_output = self.surrogate(enc_hidden)
                 gradients = self.surrogate_breed(surrogate_output, enc_hidden,
                                                  tape)
-                enc_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
+            enc_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
+            dec_hidden = enc_hidden
+            dec_input = tf.expand_dims([1],  # [1] - start token
+                                       1)
+            child = [dec_input[0, 0].numpy()]
+            for t in range(1, self.max_size - 1):
+                predictions, dec_hidden, _, _ = self.dec(
+                    dec_input, dec_hidden, enc_output)
+                pred_idx = tf.argmax(predictions[0]).numpy()
+                dec_input = tf.expand_dims([pred_idx], 0)
+                child.append(pred_idx)
+                if pred_idx == 2:
+                    break
 
-                dec_hidden = enc_hidden
-                dec_input = tf.expand_dims([1],  # [1] - start token
-                                           1)
-                child = [dec_input[0, 0].numpy()]
-                for t in range(1, self.max_size - 1):
-                    predictions, dec_hidden, _, _ = self.dec(
-                        dec_input, dec_hidden, enc_output)
-                    pred_idx = tf.argmax(predictions[0]).numpy()
-                    child.append(pred_idx)
-                    if pred_idx == 2:
-                        break
-                # child =
-                if child[-1] != 2:
-                    child.append(2)
-                child.extend([0] * (self.max_size - len(child)))
-                if not tf.math.equal(tf.expand_dims(
-                        tf.convert_to_tensor(child, dtype=tf.int32), axis=0),
-                        candidate).numpy().flatten().all():
-                    return child
+            if child[-1] != 2:
+                child.append(2)
+            child.extend([0] * (self.max_size - len(child)))
+            if not tf.math.equal(tf.expand_dims(
+                    tf.convert_to_tensor(child, dtype=tf.int32), axis=0),
+                    candidate).numpy().flatten().all():
+                print(child)
+                return child
+        return child
 
     def update(self):
         self.__train()

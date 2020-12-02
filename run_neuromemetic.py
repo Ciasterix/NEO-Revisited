@@ -84,7 +84,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
 
 if __name__ == "__main__":
-    POP_SIZE = 64
+    POP_SIZE = 256
     NUM_GEN = 200
     IN_PARAM = 6
 
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         units=128,
         hidden_size=128,
         alpha=0.8,
-        epochs=200,
+        epochs=1000,
         epoch_decay=1,
         min_epochs=10,
         verbose=True
