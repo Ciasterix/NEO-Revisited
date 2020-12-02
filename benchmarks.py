@@ -163,7 +163,7 @@ def standard_creator():
     creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMax)
 
 
-def standard_toolbox(primitives_set):
+def standard_toolbox(primitives_set, max_height=8):
     toolbox = base.Toolbox()
     toolbox.register("expr", gp.genHalfAndHalf, pset=primitives_set, min_=2, max_=4)
     toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
@@ -175,8 +175,8 @@ def standard_toolbox(primitives_set):
     toolbox.register("expr_mut", gp.genGrow, min_=0, max_=2)
     toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=primitives_set)
 
-    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=5))
-    toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=5))
+    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=max_height))
+    toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=max_height))
 
     return toolbox
 

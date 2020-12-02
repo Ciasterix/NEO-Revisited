@@ -2,6 +2,7 @@ import time
 
 import deap
 import tensorflow as tf
+from tqdm import tqdm
 
 from model.Decoder import Decoder
 from model.Encoder import Encoder
@@ -133,13 +134,13 @@ class NeoOriginal:
                 total_loss += batch_loss
 
                 # if batch % 1 == 0 and self.verbose:
-                print('Epoch {} Batch {} Loss {:.4f}'.format(
-                    epoch + 1, batch, batch_loss.numpy()))
+                # print('Epoch {} Batch {} Loss {:.4f}'.format(
+                #     epoch + 1, batch, batch_loss.numpy()))
 
             if self.verbose:
-                print('Epoch {} Loss {:.4f}'.format(
-                    epoch + 1, total_loss / self.population.steps_per_epoch))
-                print('Time for epoch {} sec\n'.format(time.time() - start))
+                epoch_loss = total_loss / self.population.steps_per_epoch
+                print('Epoch {} Loss {:.6f} Time: {}'.format(
+                    epoch + 1, epoch_loss, time.time() - start))
 
         # decrease number of epoch, but don't go below self.min_epochs
         self.epochs = max(self.epochs - self.epoch_decay, self.min_epochs)
@@ -149,11 +150,11 @@ class NeoOriginal:
         enc_cell = self.enc.initialize_cell_state(batch_sz=1)
         child = candidate
         # eta = 0
-        print("candidate", candidate)
+        # print("candidate", candidate)
         enc_output, enc_hidden, enc_cell = self.enc(
             child, [enc_hidden, enc_cell])
         for eta in range(1, 101):
-            print("eta", eta)
+            # print("eta", eta)
             # tape.watch(enc_hidden)
             with tf.GradientTape(watch_accessed_variables=False) as tape:
                 tape.watch(enc_hidden)
@@ -180,7 +181,7 @@ class NeoOriginal:
             if not tf.math.equal(tf.expand_dims(
                     tf.convert_to_tensor(child, dtype=tf.int32), axis=0),
                     candidate).numpy().flatten().all():
-                print(child)
+                # print(child)
                 return child
         return child
 
@@ -191,7 +192,7 @@ class NeoOriginal:
         # Simulate population
         data_generator = self.population(batch_size=1)
         tokenized_pop = []
-        for (batch, (inp, _, _)) in enumerate(data_generator):
+        for (batch, (inp, _, _)) in tqdm(enumerate(data_generator), desc="Breed"):
             tokenized_pop.append(self._gen_child(inp))
 
         cos1 = [self.population.tokenizer.reproduce_expression(tp) for tp in

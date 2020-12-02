@@ -84,7 +84,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
 
 if __name__ == "__main__":
-    POP_SIZE = 256
+    POP_SIZE = 1000
     NUM_GEN = 200
     IN_PARAM = 6
 
@@ -102,15 +102,15 @@ if __name__ == "__main__":
     stats = benchmarks.standard_statistics()
     neural_model = NeoOriginal(
         pset,
-        batch_size=64,
-        max_size=32,
+        batch_size=250,
+        max_size=40,
         vocab_inp_size=15,
         vocab_tar_size=15,
         embedding_dim=64,
         units=128,
         hidden_size=128,
         alpha=0.8,
-        epochs=1000,
+        epochs=200,
         epoch_decay=1,
         min_epochs=10,
         verbose=True
