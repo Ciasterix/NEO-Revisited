@@ -1,8 +1,8 @@
 import time
 
 import deap
+import numpy as np
 import tensorflow as tf
-from tqdm import tqdm
 
 from model.Decoder import Decoder
 from model.Encoder import Encoder
@@ -133,9 +133,10 @@ class NeoOriginal:
                                              enc_cell)
                 total_loss += batch_loss
 
-                # if batch % 1 == 0 and self.verbose:
-                # print('Epoch {} Batch {} Loss {:.4f}'.format(
-                #     epoch + 1, batch, batch_loss.numpy()))
+                if batch % 1 == 0 and self.verbose:
+                    print(
+                        'Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1, batch,
+                                                               batch_loss.numpy()))
 
             if self.verbose:
                 epoch_loss = total_loss / self.population.steps_per_epoch
@@ -145,55 +146,80 @@ class NeoOriginal:
         # decrease number of epoch, but don't go below self.min_epochs
         self.epochs = max(self.epochs - self.epoch_decay, self.min_epochs)
 
-    def _gen_child(self, candidate):
-        enc_hidden = self.enc.initialize_hidden_state(batch_sz=1)
-        enc_cell = self.enc.initialize_cell_state(batch_sz=1)
-        child = candidate
-        # eta = 0
-        # print("candidate", candidate)
-        enc_output, enc_hidden, enc_cell = self.enc(
-            child, [enc_hidden, enc_cell])
+    def _gen_childs(self, candidates, enc_hidden, enc_output):
+        children = []
         for eta in range(1, 101):
-            # print("eta", eta)
-            # tape.watch(enc_hidden)
-            with tf.GradientTape(watch_accessed_variables=False) as tape:
-                tape.watch(enc_hidden)
-                surrogate_output = self.surrogate(enc_hidden)
-                gradients = self.surrogate_breed(surrogate_output, enc_hidden,
-                                                 tape)
-            enc_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
-            dec_hidden = enc_hidden
-            dec_input = tf.expand_dims([1],  # [1] - start token
-                                       1)
-            child = [dec_input[0, 0].numpy()]
-            for t in range(1, self.max_size - 1):
-                predictions, dec_hidden, _, _ = self.dec(
-                    dec_input, dec_hidden, enc_output)
-                pred_idx = tf.argmax(predictions[0]).numpy()
-                dec_input = tf.expand_dims([pred_idx], 0)
-                child.append(pred_idx)
-                if pred_idx == 2:
-                    break
+            new_children, enc_hidden = self._gen_decoded(eta, enc_hidden, enc_output)
+            new_children = self.cut_seq(new_children, end_token=2)
+            new_ind, copy_ind = self.find_new(new_children, candidates)
+            print(len(copy_ind))
+            for i in new_ind:
+                children.append(new_children[i])
+            if len(copy_ind) < 1:
+                break
+            enc_hidden = tf.gather(enc_hidden, copy_ind)
+            enc_output = tf.gather(enc_output, copy_ind)
+            candidates = tf.gather(candidates, copy_ind)
+        return children
 
-            if child[-1] != 2:
-                child.append(2)
-            child.extend([0] * (self.max_size - len(child)))
-            if not tf.math.equal(tf.expand_dims(
-                    tf.convert_to_tensor(child, dtype=tf.int32), axis=0),
-                    candidate).numpy().flatten().all():
-                # print(child)
-                return child
-        return child
+    def _gen_decoded(self, eta, enc_hidden, enc_output):
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            tape.watch(enc_hidden)
+            surrogate_output = self.surrogate(enc_hidden)
+            gradients = self.surrogate_breed(surrogate_output, enc_hidden,
+                                             tape)
+        enc_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
+        dec_hidden = enc_hidden
+        dec_input = tf.expand_dims([1] * len(enc_hidden),  # [1] - start token
+                                   1)
+        child = dec_input
+        # print("dec_input", dec_input.shape)
+        for t in range(1, self.max_size - 1):
+            predictions, dec_hidden, _, _ = self.dec(
+                dec_input, dec_hidden, enc_output)
+            # pred_idx = .numpy()
+            dec_input = tf.expand_dims(tf.argmax(predictions, axis=1, output_type=tf.dtypes.int32), 1)
+            child = tf.concat([child, dec_input], axis=1)
+        stop_tokens = tf.expand_dims([2] * len(enc_hidden), 1)
+        child = tf.concat([child,
+                           stop_tokens], axis=1)
+        return child.numpy(), enc_hidden
+
+    def cut_seq(self, seq, end_token=2):
+        ind = (seq == end_token).argmax(1)
+        res = [d[:i + 1] for d, i in zip(seq, ind)]
+        return res
+
+    def find_new(self, seq, candidates):
+        new_ind = []
+        copy_ind = []
+        for i, (s, c) in enumerate(zip(seq, candidates)):
+            if not np.array_equal(s, c):
+                new_ind.append(i)
+            else:
+                copy_ind.append(i)
+        return new_ind, copy_ind
+
+    def _gen_latent(self, candidates):
+        enc_hidden = self.enc.initialize_hidden_state(batch_sz=len(candidates))
+        enc_cell = self.enc.initialize_cell_state(batch_sz=len(candidates))
+        enc_output, enc_hidden, enc_cell = self.enc(candidates,
+                                                    [enc_hidden, enc_cell])
+        return enc_hidden, enc_output
 
     def update(self):
+        print("Training")
         self.__train()
 
     def breed(self):
+        print("Breed")
         # Simulate population
-        data_generator = self.population(batch_size=1)
+        data_generator = self.population(
+            batch_size=len(self.population.samples))
         tokenized_pop = []
-        for (batch, (inp, _, _)) in tqdm(enumerate(data_generator), desc="Breed"):
-            tokenized_pop.append(self._gen_child(inp))
+        for (batch, (inp, _, _)) in enumerate(data_generator):
+            enc_hidden, enc_output = self._gen_latent(inp)
+            tokenized_pop += (self._gen_childs(inp, enc_hidden, enc_output))
 
         cos1 = [self.population.tokenizer.reproduce_expression(tp) for tp in
                 tokenized_pop]
