@@ -3,13 +3,13 @@ import tensorflow as tf
 from model.Encoder import Encoder
 
 
-class Surrogate(tf.keras.layers.Layer):
+class Surrogate(tf.keras.Model):
     def __init__(self, hidden_size):
         super(Surrogate, self).__init__()
         self.fc = tf.keras.layers.Dense(hidden_size)
         self.out = tf.keras.layers.Dense(1)
 
-    def call(self, inputs):
+    def __call__(self, inputs):
         x = self.fc(inputs)
         x = self.out(x)
         return x
