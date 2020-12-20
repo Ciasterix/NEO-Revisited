@@ -42,12 +42,13 @@ class NeoOriginal:
         self.dec = Decoder(vocab_tar_size, embedding_dim, units, batch_size)
         self.surrogate = Surrogate(hidden_size)
         self.population = Population(pset, max_size, batch_size)
+        self.prob = 0.5
 
         self.optimizer = tf.keras.optimizers.Adam()
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=True, reduction='none')
 
-    # @tf.function
+    @tf.function
     def train_step(self, inp, targ, targ_surrogate, enc_hidden,
                    enc_cell):
         autoencoder_loss = 0
@@ -67,6 +68,7 @@ class NeoOriginal:
             for t in range(1, self.max_size):
                 # print(t)
                 # passing enc_output to the decoder
+                # print(dec_input.shape)
                 predictions, dec_hidden, _, _ = self.dec(
                     dec_input, dec_hidden, enc_output)
                 tmp_targ = targ[:, t]
@@ -74,7 +76,13 @@ class NeoOriginal:
                                                                    predictions)
 
                 # using teacher forcing
-                dec_input = tf.expand_dims(targ[:, t], 1)
+                if tf.random.uniform(shape=[], maxval=1,
+                                     dtype=tf.float32) > self.prob:
+                    dec_input = tf.expand_dims(targ[:, t], 1)
+                else:
+                    dec_input = tf.expand_dims(tf.argmax(predictions, axis=1,
+                                                         output_type=tf.dtypes.int32),
+                                               1)
             loss = autoencoder_loss + self.alpha * surrogate_loss
         # print("-" * 80)
         # print("AE loss:", autoencoder_loss.numpy())
@@ -133,7 +141,7 @@ class NeoOriginal:
                                              enc_cell)
                 total_loss += batch_loss
 
-                if batch % 1 == 0 and self.verbose:
+                if False and batch % 1 == 0 and self.verbose:
                     print(
                         'Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1, batch,
                                                                batch_loss.numpy()))
@@ -151,7 +159,8 @@ class NeoOriginal:
         eta = 0
         while eta < 1000:
             eta += 1
-            new_children = self._gen_decoded(eta, enc_hidden, enc_output).numpy()
+            new_children = self._gen_decoded(eta, enc_hidden,
+                                             enc_output).numpy()
             new_children = self.cut_seq(new_children, end_token=2)
             new_ind, copy_ind = self.find_new(new_children, candidates)
             print("eta", eta, "copy", len(copy_ind))
@@ -173,10 +182,10 @@ class NeoOriginal:
             # surrogate_output = 2 * enc_hidden
         gradients = self.surrogate_breed(surrogate_output, enc_hidden,
                                          tape)
-        print("grad l1-norm", tf.norm(gradients, 1))
-        print("latent l1-norm before update", tf.norm(enc_hidden, 1))
+        tf.print("grad l1-norm", tf.norm(gradients, 1))
+        tf.print("latent l1-norm before update", tf.norm(enc_hidden, 1))
         dec_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
-        print("latent l1-norm after update", tf.norm(dec_hidden, 1))
+        tf.print("latent l1-norm after update", tf.norm(dec_hidden, 1))
         dec_input = tf.expand_dims([1] * len(enc_hidden),  # [1] - start token
                                    1)
         child = dec_input
@@ -185,7 +194,8 @@ class NeoOriginal:
             predictions, dec_hidden, _, _ = self.dec(
                 dec_input, dec_hidden, enc_output)
             # pred_idx = .numpy()
-            dec_input = tf.expand_dims(tf.argmax(predictions, axis=1, output_type=tf.dtypes.int32), 1)
+            dec_input = tf.expand_dims(
+                tf.argmax(predictions, axis=1, output_type=tf.dtypes.int32), 1)
             child = tf.concat([child, dec_input], axis=1)
         stop_tokens = tf.expand_dims([2] * len(enc_hidden), 1)
         child = tf.concat([child,
@@ -194,7 +204,8 @@ class NeoOriginal:
 
     def cut_seq(self, seq, end_token=2):
         ind = (seq == end_token).argmax(1)
-        res = [np.pad(d[:i + 1], (0, self.max_size - i - 1)) for d, i in zip(seq, ind)]
+        res = [np.pad(d[:i + 1], (0, self.max_size - i - 1)) for d, i in
+               zip(seq, ind)]
         return res
 
     def find_new(self, seq, candidates):
@@ -224,10 +235,17 @@ class NeoOriginal:
 
     def update(self):
         print("Training")
+        self.dec.train()
         self.__train()
-        self.enc.save_weights("model/weights/encoder/enc_{}".format(self.train_steps), save_format="tf")
-        self.dec.save_weights("model/weights/decoder/dec_{}".format(self.train_steps), save_format="tf")
-        self.surrogate.save_weights("model/weights/surrogate/surrogate_{}".format(self.train_steps), save_format="tf")
+        self.enc.save_weights(
+            "model/weights/encoder/enc_{}".format(self.train_steps),
+            save_format="tf")
+        self.dec.save_weights(
+            "model/weights/decoder/dec_{}".format(self.train_steps),
+            save_format="tf")
+        self.surrogate.save_weights(
+            "model/weights/surrogate/surrogate_{}".format(self.train_steps),
+            save_format="tf")
 
         # tf.saved_model.save(self.enc, "model/weights/enc_{}".format(self.train_steps))
         # tf.saved_model.save(self.dec, "model/weights/dec_{}".format(self.train_steps))
@@ -235,6 +253,7 @@ class NeoOriginal:
 
     def breed(self):
         print("Breed")
+        self.dec.eval()
         # Simulate population
         print("First program before breed", self.population.samples[0])
         data_generator = self.population(
