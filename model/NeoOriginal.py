@@ -157,7 +157,7 @@ class NeoOriginal:
     def _gen_childs(self, candidates, enc_hidden, enc_output):
         children = []
         eta = 0
-        while eta < 1000:
+        while eta < 100:
             eta += 1
             new_children = self._gen_decoded(eta, enc_hidden,
                                              enc_output).numpy()
@@ -182,10 +182,10 @@ class NeoOriginal:
             # surrogate_output = 2 * enc_hidden
         gradients = self.surrogate_breed(surrogate_output, enc_hidden,
                                          tape)
-        tf.print("grad l1-norm", tf.norm(gradients, 1))
-        tf.print("latent l1-norm before update", tf.norm(enc_hidden, 1))
+        # tf.print("grad l1-norm", tf.norm(gradients, 1))
+        # tf.print("latent l1-norm before update", tf.norm(enc_hidden, 1))
         dec_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
-        tf.print("latent l1-norm after update", tf.norm(dec_hidden, 1))
+        # tf.print("latent l1-norm after update", tf.norm(dec_hidden, 1))
         dec_input = tf.expand_dims([1] * len(enc_hidden),  # [1] - start token
                                    1)
         child = dec_input
@@ -216,12 +216,12 @@ class NeoOriginal:
         for i, (s, c) in enumerate(zip(seq, candidates)):
             if not np.array_equal(s, c):
                 if not n:
-                    print("S:", s, "C", c)
+                    # print("S:", s, "C", c)
                     n = True
                 new_ind.append(i)
             else:
                 if not cp:
-                    print("S:", s, "C", c)
+                    # print("S:", s, "C", c)
                     cp = True
                 copy_ind.append(i)
         return new_ind, copy_ind

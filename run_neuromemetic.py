@@ -5,6 +5,13 @@ from deap import tools
 import benchmarks
 from model.NeoOriginal import NeoOriginal
 
+def save_population(offspring, path):
+    # token_offs = [str(o) for o in offspring]
+    with open(path, 'w') as f:
+        for o in offspring:
+            # wr = csv.writer(f)
+            # wr.writerows(token_offs)
+            f.write(str(o)+'\n')
 
 def memetic_algorithm(population, toolbox, ngen, model, stats=None,
                       halloffame=None, verbose=__debug__):
@@ -40,7 +47,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     if verbose:
         print(logbook.stream)
 
-    # epochs = 200
+    save_population(population, f"offsprings/0_pop_start.txt")
 
     # Begin the generational process
     for gen in range(1, ngen + 1):
@@ -54,6 +61,9 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
         # Breeding neural model
         offspring = model.breed()
+
+        # store offspring
+        save_population(offspring, f"offsprings/{gen}.txt")
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
