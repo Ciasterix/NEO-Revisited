@@ -30,6 +30,8 @@ class Population:
     def update(self, offspring):
         self.samples = [self.tokenizer.tokenize_tree(str(p)) for p in
                          offspring]
+        len = (np.array(self.samples) == 2).argmax(1) + 1
+        print("Min, Mean, Max:", np.min(len), np.mean(len), np.max(len))
         # print("Update shape", np.array(self.samples).shape)
         self.fitness = [p.fitness.values for p in offspring]
         # self.

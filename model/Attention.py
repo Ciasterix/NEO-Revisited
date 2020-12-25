@@ -6,7 +6,7 @@ class Attention(tf.keras.layers.Layer):
         super(Attention, self).__init__()
         self.dot = tf.keras.layers.Dot(axes=(1,2))
 
-    def call(self, query, values):
+    def __call__(self, query, values):
         score = tf.expand_dims(self.dot([query, values]), -1)
         attention_weights = tf.nn.softmax(score, axis=1)
         context_vector = attention_weights * values

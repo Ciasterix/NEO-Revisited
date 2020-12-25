@@ -6,6 +6,13 @@ import benchmarks
 from model.NeoOriginal import NeoOriginal
 
 
+def save_population(offspring, path):
+    print("saving offspring to", path)
+    with open(path, 'w') as f:
+        for o in offspring:
+            f.write(str(o) + '\n')
+
+
 def memetic_algorithm(population, toolbox, ngen, model, stats=None,
                       halloffame=None, verbose=__debug__):
     """This function is a modified version of eaSimple from deap library
@@ -47,6 +54,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
         # max((epochs - 1, 10))
         # Select the next generation individuals
         offspring = toolbox.select(population, len(population))
+        save_population(offspring, f"offsprings/{gen}.txt")
         model.population.update(offspring)
 
         # Training neural model
@@ -54,6 +62,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
         # Breeding neural model
         offspring = model.breed()
+
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -95,6 +104,7 @@ if __name__ == "__main__":
     pset = benchmarks.standard_boolean_pset(IN_PARAM)
     toolbox = benchmarks.standard_toolbox(pset)
     ev = benchmarks.Maj(pset, IN_PARAM)
+    toolbox.register("select", tools.selTournament, tournsize=7)
     toolbox.register("evaluate", ev)
 
     pop = toolbox.population(n=POP_SIZE)
@@ -102,7 +112,7 @@ if __name__ == "__main__":
     stats = benchmarks.standard_statistics()
     neural_model = NeoOriginal(
         pset,
-        batch_size=250,
+        batch_size=256,
         max_size=40,
         vocab_inp_size=15,
         vocab_tar_size=15,

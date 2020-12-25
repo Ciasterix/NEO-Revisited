@@ -6,11 +6,14 @@ from model.Encoder import Encoder
 class Surrogate(tf.keras.Model):
     def __init__(self, hidden_size):
         super(Surrogate, self).__init__()
-        self.fc = tf.keras.layers.Dense(hidden_size, activation="relu")
+        self.fc1 = tf.keras.layers.Dense(hidden_size, activation="relu")
+        # self.fc2 = tf.keras.layers.Dense(hidden_size, activation="relu")
         self.out = tf.keras.layers.Dense(1, activation="sigmoid")
 
     def __call__(self, inputs):
-        x = self.fc(inputs)
+        x = self.fc1(inputs)
+        # x = self.fc2(x)
+        # x = tf.math.reduce_sum(x, axis=1)
         x = self.out(x)
         return x
 
