@@ -5,13 +5,13 @@ from deap import tools
 import benchmarks
 from model.NeoOriginal import NeoOriginal
 
-
 def save_population(offspring, path):
-    print("saving offspring to", path)
+    # token_offs = [str(o) for o in offspring]
     with open(path, 'w') as f:
         for o in offspring:
-            f.write(str(o) + '\n')
-
+            # wr = csv.writer(f)
+            # wr.writerows(token_offs)
+            f.write(str(o)+'\n')
 
 def memetic_algorithm(population, toolbox, ngen, model, stats=None,
                       halloffame=None, verbose=__debug__):
@@ -47,14 +47,13 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     if verbose:
         print(logbook.stream)
 
-    # epochs = 200
+    save_population(population, f"offsprings/0_pop_start.txt")
 
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # max((epochs - 1, 10))
         # Select the next generation individuals
         offspring = toolbox.select(population, len(population))
-        save_population(offspring, f"offsprings/{gen}.txt")
         model.population.update(offspring)
 
         # Training neural model
@@ -63,6 +62,8 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
         # Breeding neural model
         offspring = model.breed()
 
+        # store offspring
+        save_population(offspring, f"offsprings/{gen}.txt")
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -104,7 +105,6 @@ if __name__ == "__main__":
     pset = benchmarks.standard_boolean_pset(IN_PARAM)
     toolbox = benchmarks.standard_toolbox(pset)
     ev = benchmarks.Maj(pset, IN_PARAM)
-    toolbox.register("select", tools.selTournament, tournsize=7)
     toolbox.register("evaluate", ev)
 
     pop = toolbox.population(n=POP_SIZE)
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     stats = benchmarks.standard_statistics()
     neural_model = NeoOriginal(
         pset,
-        batch_size=256,
+        batch_size=250,
         max_size=40,
         vocab_inp_size=15,
         vocab_tar_size=15,
