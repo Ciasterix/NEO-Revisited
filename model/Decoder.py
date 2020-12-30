@@ -8,7 +8,7 @@ class Decoder(tf.keras.Model):
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
-        self.embedding = tf.keras.layers.Embedding(vocab_inp_size, embedding_dim)
+        self.embedding = tf.keras.layers.Embedding(vocab_inp_size, embedding_dim, mask_zero=True)
         self.lstm = tf.keras.layers.LSTM(self.dec_units,
                                          return_sequences=True,
                                          return_state=True,
@@ -16,6 +16,7 @@ class Decoder(tf.keras.Model):
         self.fc = tf.keras.layers.Dense(vocab_tar_size)
 
         self.optimizer = tf.keras.optimizers.Adam()
+        self.bn_hidden = tf.keras.layers.BatchNormalization()
 
         # used for attention
         self.attention = Attention()

@@ -6,28 +6,35 @@ class Encoder(tf.keras.Model):
         super(Encoder, self).__init__()
         self.batch_sz = batch_sz
         self.enc_units = enc_units
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
+        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, mask_zero=False)
         self.lstm = tf.keras.layers.LSTM(self.enc_units,
                                        return_sequences=True,
                                        return_state=True,
                                        recurrent_initializer='glorot_uniform')
+        self.bn_hidden = tf.keras.layers.BatchNormalization()
+
         self.optimizer = tf.keras.optimizers.Adam()
 
-    def __call__(self, x, hidden):
+    def __call__(self, x, states):
         x = self.embedding(x)
-        output, hidden_state, cell_state = self.lstm(x, initial_state=hidden)
+        hidden_state, cell_state = states
+        output, hidden_state, cell_state = self.lstm(x, initial_state=[hidden_state, cell_state])
         return output, hidden_state, cell_state
 
     def initialize_hidden_state(self, batch_sz=None):
         if batch_sz is not None:
+            # return tf.random.normal(shape=[batch_sz, self.enc_units])
             return tf.zeros((batch_sz, self.enc_units))
         else:
+            # return tf.random.normal(shape=[batch_sz, self.enc_units])
             return tf.zeros((self.batch_sz, self.enc_units))
 
     def initialize_cell_state(self, batch_sz=None):
         if batch_sz is not None:
+            # return tf.random.normal(shape=[batch_sz, self.enc_units])
             return tf.zeros((batch_sz, self.enc_units))
         else:
+            # return tf.random.normal(shape=[batch_sz, self.enc_units])
             return tf.zeros((self.batch_sz, self.enc_units))
 
     def backward(self, loss, tape):
@@ -40,6 +47,12 @@ class Encoder(tf.keras.Model):
 
     def update(self, loss, tape):
         self.optimize(*self.backward(loss, tape))
+
+    def train(self):
+        self.training = True
+
+    def eval(self):
+        self.training = False
 
 if __name__ == "__main__":
     BATCH_SIZE = 256
