@@ -1,72 +1,52 @@
 import tensorflow as tf
 
-# from model.Attention import Attention
+from model.Attention import Attention
 
 
 class Decoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
+    def __init__(self, vocab_inp_size, vocab_tar_size, embedding_dim, dec_units, batch_sz):
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        # self.lstm = tf.keras.layers.LSTM(self.dec_units,
-        #                                  return_sequences=True,
-        #                                  return_state=True,
-        #                                  recurrent_initializer='glorot_uniform')
-        self.gru = tf.keras.layers.GRU(self.dec_units,
-                                       return_sequences=True,
-                                       return_state=True,
-                                       recurrent_initializer='glorot_uniform')
-        self.fc = tf.keras.layers.Dense(vocab_size)
+        self.embedding = tf.keras.layers.Embedding(vocab_inp_size, embedding_dim)
+        self.lstm = tf.keras.layers.LSTM(self.dec_units,
+                                         return_sequences=True,
+                                         return_state=True,
+                                         recurrent_initializer='glorot_uniform')
+        self.fc = tf.keras.layers.Dense(vocab_tar_size)
+
+        self.optimizer = tf.keras.optimizers.Adam()
 
         # used for attention
-        # self.attention = Attention()
-        # self.attention = tf.keras.layers.Attention()
-        self.attention = tf.keras.layers.Attention(dropout=0.0, use_scale=True)
-        # E_proj = get_EF(input_size=40, dim=16, method="learnable", head_dim=1)
-        # F_proj = get_EF(input_size=40, dim=16, method="learnable", head_dim=1)
-        # self.attention = LinAttention(dim=128, dropout=0.0, E_proj=E_proj, F_proj=F_proj, full_attention=False)
+        self.attention = Attention()
 
-    def __call__(self, x, hidden_state_in, enc_output, mask=None):
-        # enc_output shape == (batch_size, max_length, hidden_size)
-        hidden_state = tf.expand_dims(hidden_state_in, axis=1)
-        # print("dec in", hidden_state.shape, enc_output.shape)
-        if mask is not None:
-            context_vector = self.attention(inputs=[hidden_state, enc_output],
-                                            mask=[None, mask],
-                                            training=self.training)
-        else:
-            context_vector = self.attention(inputs=[hidden_state, enc_output],
-                                            training=self.training)
-        # context_vector = self.attention(Q=hidden_state, K=enc_output, V=enc_output)
-
-        # x shape after passing through embedding == (batch_size, 1, embedding_dim)
+    def __call__(self, x, context_vector, enc_output, states):
+        hidden_state, cell_state = states
         x = self.embedding(x)
+        x = tf.concat([x, context_vector], axis=-1)
+        output, hidden_state, cell_state = self.lstm(x, initial_state=states)
 
-        # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
-        # print("x", x.shape)
-        # x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
-        # context_vector = tf.keras.layers.Dropout(0.9)(context_vector, training=self.training)
-        x = tf.concat([context_vector, x], axis=-1)
-        # x = context_vector
+        # Attention
+        x = tf.expand_dims(hidden_state, axis=1)
+        context_vector, attention_weights = self.attention(query=x, values=enc_output)
 
-        # print("after concat", x.shape)
+        x = tf.concat([output, context_vector], axis=-1)
 
-        # passing the concatenated vector to the GRU
-        # output, hidden_state, cell_state = self.lstm(x)
-        # print(hidden_state.shape)
-        output, hidden_state = self.gru(x, initial_state=hidden_state_in)
-        # output, hidden_state = self.gru2(x)
-
-        # output shape == (batch_size * 1, hidden_size)
-        output = tf.reshape(output, (-1, output.shape[2]))
-        # print("output", output.shape)
-
-        # output shape == (batch_size, vocab)
+        output = tf.reshape(x, (-1, x.shape[2]))
         x = self.fc(output)
-        # print("x", x.shape)
 
-        return x, hidden_state, None, None  # attention_weights
+        return x, context_vector, [hidden_state, cell_state], attention_weights
+
+    def backward(self, loss, tape):
+        variables = self.trainable_variables
+        gradients = tape.gradient(loss, variables)
+        return gradients, variables
+
+    def optimize(self, gradients, variables):
+        self.optimizer.apply_gradients(zip(gradients, variables))
+
+    def update(self, loss, tape):
+        self.optimize(*self.backward(loss, tape))
 
     def train(self):
         self.training = True

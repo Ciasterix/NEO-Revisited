@@ -7,25 +7,16 @@ class Encoder(tf.keras.Model):
         self.batch_sz = batch_sz
         self.enc_units = enc_units
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        # self.lstm = tf.keras.layers.LSTM(self.enc_units,
-        #                                return_sequences=True,
-        #                                return_state=True,
-        #                                recurrent_initializer='glorot_uniform')
-        self.gru = tf.keras.layers.GRU(self.enc_units,
-                                       return_sequences=False,
+        self.lstm = tf.keras.layers.LSTM(self.enc_units,
+                                       return_sequences=True,
                                        return_state=True,
                                        recurrent_initializer='glorot_uniform')
+        self.optimizer = tf.keras.optimizers.Adam()
 
     def __call__(self, x, hidden):
-        # print("Enc shape:", x.shape)
         x = self.embedding(x)
-        # output, hidden_state, cell_state = self.lstm(x, initial_state=hidden)
-        output, hidden_state = self.gru(x, initial_state=hidden)
-        # output = self.gru(x)
-        # print(output.shape)
-        # print(output.shape, hidden_state.shape)
-        # output, hidden_state = self.gru2(output)
-        return output, hidden_state  # , cell_state
+        output, hidden_state, cell_state = self.lstm(x, initial_state=hidden)
+        return output, hidden_state, cell_state
 
     def initialize_hidden_state(self, batch_sz=None):
         if batch_sz is not None:
@@ -39,6 +30,16 @@ class Encoder(tf.keras.Model):
         else:
             return tf.zeros((self.batch_sz, self.enc_units))
 
+    def backward(self, loss, tape):
+        variables = self.trainable_variables
+        gradients = tape.gradient(loss, variables)
+        return gradients, variables
+
+    def optimize(self, gradients, variables):
+        self.optimizer.apply_gradients(zip(gradients, variables))
+
+    def update(self, loss, tape):
+        self.optimize(*self.backward(loss, tape))
 
 if __name__ == "__main__":
     BATCH_SIZE = 256

@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from model.Attention import Attention
 from model.Encoder import Encoder
 
 
@@ -7,16 +8,29 @@ class Surrogate(tf.keras.Model):
     def __init__(self, hidden_size):
         super(Surrogate, self).__init__()
         self.fc1 = tf.keras.layers.Dense(hidden_size, activation="relu")
-        # self.fc2 = tf.keras.layers.Dense(hidden_size, activation="relu")
+        self.fc2 = tf.keras.layers.Dense(hidden_size, activation="relu")
         self.out = tf.keras.layers.Dense(1, activation="sigmoid")
 
-    def __call__(self, inputs):
-        x = self.fc1(inputs)
-        # x = self.fc2(x)
-        # x = tf.math.reduce_sum(x, axis=1)
+        self.attention = Attention()
+
+        self.optimizer = tf.keras.optimizers.Adam()
+
+    def __call__(self, hidden_state):
+        x = self.fc1(hidden_state)
+        x = self.fc2(x)
         x = self.out(x)
         return x
 
+    def backward(self, loss, tape):
+        variables = self.trainable_variables
+        gradients = tape.gradient(loss, variables)
+        return gradients, variables
+
+    def optimize(self, gradients, variables):
+        self.optimizer.apply_gradients(zip(gradients, variables))
+
+    def update(self, loss, tape):
+        self.optimize(*self.backward(loss, tape))
 
 if __name__ == "__main__":
     BATCH_SIZE = 64
