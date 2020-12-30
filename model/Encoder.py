@@ -6,7 +6,7 @@ class Encoder(tf.keras.Model):
         super(Encoder, self).__init__()
         self.batch_sz = batch_sz
         self.enc_units = enc_units
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, mask_zero=False)
+        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, mask_zero=True)
         self.lstm = tf.keras.layers.LSTM(self.enc_units,
                                        return_sequences=True,
                                        return_state=True,
