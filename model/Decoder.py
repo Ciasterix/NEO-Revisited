@@ -19,7 +19,7 @@ class Decoder(tf.keras.Model):
 
         self.attention = tf.keras.layers.Attention()
 
-    def __call__(self, x, context_vector, enc_output, states):
+    def __call__(self, x, context_vector, enc_output, states, enc_mask=None):
         hidden_state, cell_state = states
         x = self.embedding(x)
         mask = x._keras_mask
@@ -32,8 +32,10 @@ class Decoder(tf.keras.Model):
 
         # Attention
         x = tf.expand_dims(hidden_state, axis=1)
+        if enc_mask is None:
+            enc_mask = enc_output._keras_mask
         context_vector = self.attention(inputs=[x, enc_output],
-                                        mask=[mask, enc_output._keras_mask])
+                                        mask=[mask, enc_mask])
 
         x = self.concat2([output, context_vector])
         output = tf.keras.layers.Reshape((x.shape[2],))(x)

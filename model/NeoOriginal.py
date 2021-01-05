@@ -47,7 +47,7 @@ class NeoOriginal:
 
         self.optimizer = tf.keras.optimizers.Adam()
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=True)#, reduction='none')
+            from_logits=True, reduction='none')
 
     def save_models(self):
         self.enc.save_weights(
@@ -68,7 +68,7 @@ class NeoOriginal:
         self.surrogate.load_weights(
             "model/weights/surrogate/surrogate_{}".format(train_steps))
 
-    @tf.function
+    # @tf.function
     def train_step(self, inp, targ, targ_surrogate, enc_hidden,
                    enc_cell):
         autoencoder_loss = 0
@@ -114,7 +114,7 @@ class NeoOriginal:
         # print("AE loss:", autoencoder_loss.numpy())
         # print("Surrogate loss:", surrogate_loss.numpy())
         # print(targ.shape[1])
-        batch_loss = (loss / int(targ.shape[1]))
+        batch_loss = (autoencoder_loss / int(targ.shape[1])) + self.alpha * surrogate_loss
         batch_ae_loss = (autoencoder_loss / int(targ.shape[1]))
         batch_surrogate_loss = surrogate_loss
         # self.enc.update(loss, tape)
@@ -194,16 +194,14 @@ class NeoOriginal:
         # decrease number of epoch, but don't go below self.min_epochs
         self.epochs = max(self.epochs - self.epoch_decay, self.min_epochs)
 
-    def _gen_childs(self, candidates, enc_output, enc_hidden, enc_cell, max_eta=10000):
+    def _gen_childs(self, candidates, enc_output, enc_hidden, enc_cell, max_eta=1000):
         children = []
         eta = 0
+        enc_mask = enc_output._keras_mask
         while eta < max_eta:
-            if eta < 1000:
-                eta += 1
-            else:
-                eta += 10
+            eta += 1
             start = time.time()
-            new_children = self._gen_decoded(eta, enc_output, enc_hidden, enc_cell).numpy()
+            new_children = self._gen_decoded(eta, enc_output, enc_hidden, enc_cell, enc_mask).numpy()
             new_children = self.cut_seq(new_children, end_token=2)
             new_ind, copy_ind = self.find_new(new_children, candidates)
             print("Eta {} Not-changed {} Time: {:.3f}".format(
@@ -213,6 +211,7 @@ class NeoOriginal:
             if len(copy_ind) < 1:
                 break
             enc_output = tf.gather(enc_output, copy_ind)
+            enc_mask = tf.gather(enc_mask, copy_ind)
             enc_hidden = tf.gather(enc_hidden, copy_ind)
             enc_cell = tf.gather(enc_cell, copy_ind)
             candidates = tf.gather(candidates, copy_ind)
@@ -222,13 +221,14 @@ class NeoOriginal:
             children.append(new_children[i])
         return children
 
-    def _gen_decoded(self, eta, enc_output, enc_hidden, enc_cell):
+    def _gen_decoded(self, eta, enc_output, enc_hidden, enc_cell, enc_mask):
         with tf.GradientTape(persistent=True, watch_accessed_variables=False) as tape:
             tape.watch(enc_hidden)
             # tape.watch(enc_output)
             surrogate_output = self.surrogate(enc_hidden)
             # print("enc_hidden shape", enc_hidden.shape)
             # surrogate_output = 2 * enc_hidden
+        # print(surrogate_output)
         gradients = self.surrogate_breed(surrogate_output, enc_hidden,
                                          tape)
         dec_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
@@ -241,7 +241,7 @@ class NeoOriginal:
         for t in range(1, self.max_size - 1):
             initial_state = [dec_hidden, dec_cell]
             predictions, context, [dec_hidden, dec_cell], _ = self.dec(
-                dec_input, context, enc_output, initial_state)
+                dec_input, context, enc_output, initial_state, enc_mask)
             dec_input = tf.expand_dims(
                 tf.argmax(predictions, axis=1, output_type=tf.dtypes.int32), 1)
             child = tf.concat([child, dec_input], axis=1)
@@ -291,6 +291,7 @@ class NeoOriginal:
 
     def update(self):
         print("Training")
+        self.enc.train()
         self.dec.train()
         self.__train()
         self.save_models()
