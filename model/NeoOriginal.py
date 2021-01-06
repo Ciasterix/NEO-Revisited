@@ -47,7 +47,8 @@ class NeoOriginal:
 
         self.optimizer = tf.keras.optimizers.Adam()
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=True, reduction='none')
+            from_logits=False, reduction='none')
+            # from_logits = True, reduction = 'none')
 
     def save_models(self):
         self.enc.save_weights(
@@ -68,7 +69,7 @@ class NeoOriginal:
         self.surrogate.load_weights(
             "model/weights/surrogate/surrogate_{}".format(train_steps))
 
-    # @tf.function
+    @tf.function
     def train_step(self, inp, targ, targ_surrogate, enc_hidden,
                    enc_cell):
         autoencoder_loss = 0
@@ -254,12 +255,15 @@ class NeoOriginal:
         ind = (seq == end_token).argmax(1)
         # res = [np.pad(d[:i + 1], (0, self.max_size - i - 1)) for d, i in zip(seq, ind)]
         res = []
+        tree_max = []
         for d, i in zip(seq, ind):
             repaired_tree = create_expression_tree(d[:i + 1][1:-1])
             repaired_seq = [i.data for i in repaired_tree.preorder()][
                            -(self.max_size - 2):]
+            tree_max.append(len(repaired_seq) == self.max_size - 2)
             repaired_seq = [1] + repaired_seq + [2]
             res.append(np.pad(repaired_seq, (0, self.max_size - i - 1)))
+        print(sum(tree_max))
         return res
 
     def find_new(self, seq, candidates):
