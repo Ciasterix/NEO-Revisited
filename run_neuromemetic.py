@@ -100,7 +100,7 @@ if __name__ == "__main__":
         units=128,
         hidden_size=128,
         alpha=0.8,
-        epochs=20,
+        epochs=200,
         epoch_decay=1,
         min_epochs=10,
         verbose=True
