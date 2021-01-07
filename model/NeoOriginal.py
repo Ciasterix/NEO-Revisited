@@ -170,7 +170,7 @@ class NeoOriginal:
                     print(f'Epoch {epoch + 1} Batch {batch} '
                           f'Loss {batch_loss.numpy():.4f}')
 
-            if self.verbose and (epoch % 10 == 0):
+            if self.verbose and ((epoch + 1) % 10 == 0 or epoch == 0):
                 epoch_loss = total_loss / self.population.steps_per_epoch
                 ae_loss = total_ae_loss / self.population.steps_per_epoch
                 surrogate_loss = \
@@ -188,6 +188,7 @@ class NeoOriginal:
         children = []
         eta = 0
         enc_mask = enc_output._keras_mask
+        last_copy_ind = len(candidates)
         while eta < max_eta:
             eta += 1
             start = time.time()
@@ -195,8 +196,10 @@ class NeoOriginal:
                 eta, enc_output, enc_hidden, enc_cell, enc_mask).numpy()
             new_children = self.cut_seq(new_children, end_token=2)
             new_ind, copy_ind = self.find_new(new_children, candidates)
-            print("Eta {} Not-changed {} Time: {:.3f}".format(
-                eta, len(copy_ind), time.time() - start))
+            if len(copy_ind) < last_copy_ind:
+                last_copy_ind = len(copy_ind)
+                print("Eta {} Not-changed {} Time: {:.3f}".format(
+                    eta, len(copy_ind), time.time() - start))
             for i in new_ind:
                 children.append(new_children[i])
             if len(copy_ind) < 1:
