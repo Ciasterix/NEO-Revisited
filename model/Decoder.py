@@ -6,7 +6,9 @@ class Decoder(tf.keras.Model):
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
-        self.embedding = tf.keras.layers.Embedding(vocab_inp_size, embedding_dim, mask_zero=True)
+        self.embedding = tf.keras.layers.Embedding(vocab_inp_size,
+                                                   embedding_dim,
+                                                   mask_zero=True)
         self.lstm = tf.keras.layers.LSTM(self.dec_units,
                                          return_sequences=True,
                                          return_state=True,
@@ -22,18 +24,18 @@ class Decoder(tf.keras.Model):
                                          use_bias=False)
 
         self.optimizer = tf.keras.optimizers.Adam()
-
         self.attention = tf.keras.layers.Attention()
 
     def __call__(self, x, context_vector, enc_output, states, enc_mask=None):
-        hidden_state, cell_state = states
+        # hidden_state, cell_state = states
         x = self.embedding(x)
         mask = x._keras_mask
         x = tf.concat([x, context_vector], axis=-1)
         output, hidden_state, cell_state = self.lstm(x, initial_state=states)
         hidden_state = tf.where(mask, hidden_state, states[0])
         cell_state = tf.where(mask, cell_state, states[1])
-        output = output*tf.expand_dims(tf.cast(mask, dtype=tf.float32), axis=2)
+        output = output * tf.expand_dims(
+            tf.cast(mask, dtype=tf.float32), axis=2)
 
         # Attention
         x = tf.expand_dims(hidden_state, axis=1)
@@ -47,10 +49,11 @@ class Decoder(tf.keras.Model):
         context_shape = context_vector.shape
         context_vector = tf.reshape(self.att(output), context_shape)
 
-        output = tf.keras.layers.Reshape((context_vector.shape[2],))(context_vector)
+        output = tf.keras.layers.Reshape(
+            (context_vector.shape[2],))(context_vector)
         x = self.out(output)
 
-        return x, context_vector, [hidden_state, cell_state], None# attention_weights
+        return x, context_vector, [hidden_state, cell_state], None
 
     def backward(self, loss, tape):
         variables = self.trainable_variables

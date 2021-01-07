@@ -32,6 +32,7 @@ class Surrogate(tf.keras.Model):
     def update(self, loss, tape):
         self.optimize(*self.backward(loss, tape))
 
+
 if __name__ == "__main__":
     BATCH_SIZE = 64
     vocab_inp_size = 32

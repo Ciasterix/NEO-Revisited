@@ -5,31 +5,15 @@ from deap import tools
 import benchmarks
 from model.NeoOriginal import NeoOriginal
 
+
 def save_population(offspring, path):
-    # token_offs = [str(o) for o in offspring]
     with open(path, 'w') as f:
         for o in offspring:
-            # wr = csv.writer(f)
-            # wr.writerows(token_offs)
             f.write(str(o)+'\n')
+
 
 def memetic_algorithm(population, toolbox, ngen, model, stats=None,
                       halloffame=None, verbose=__debug__):
-    """This function is a modified version of eaSimple from deap library
-    :param population: A list of individuals.
-    :param toolbox: A :class:`~deap.base.Toolbox` that contains the evolution
-                    operators.
-    :param ngen: The number of generation.
-    :param model: Neo neural model to update and breed
-    :param stats: A :class:`~deap.tools.Statistics` object that is updated
-                  inplace, optional.
-    :param halloffame: A :class:`~deap.tools.HallOfFame` object that will
-                       contain the best individuals, optional.
-    :param verbose: Whether or not to log the statistics.
-    :returns: The final population
-    :returns: A class:`~deap.tools.Logbook` with the statistics of the
-              evolution
-    """
     logbook = tools.Logbook()
     logbook.header = ['gen', 'nevals'] + (stats.fields if stats else [])
 
@@ -51,7 +35,6 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
     # Begin the generational process
     for gen in range(1, ngen + 1):
-        # max((epochs - 1, 10))
         # Select the next generation individuals
         offspring = toolbox.select(population, len(population))
         model.population.update(offspring)
@@ -67,12 +50,9 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
         # Evaluate the individuals with an invalid fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        # try:
         fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
-        # except:
-        #     print(ind)
 
         # Update the hall of fame with the generated individuals
         if halloffame is not None:
@@ -94,7 +74,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
 
 
 if __name__ == "__main__":
-    POP_SIZE = 1000
+    POP_SIZE = 100
     NUM_GEN = 200
     IN_PARAM = 6
 
@@ -120,7 +100,7 @@ if __name__ == "__main__":
         units=128,
         hidden_size=128,
         alpha=0.8,
-        epochs=200,
+        epochs=20,
         epoch_decay=1,
         min_epochs=10,
         verbose=True
