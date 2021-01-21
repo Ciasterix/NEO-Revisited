@@ -10,7 +10,7 @@ class Decoder(tf.keras.Model):
                                                    embedding_dim,
                                                    mask_zero=True)
         self.lstm = tf.keras.layers.LSTM(self.dec_units,
-                                         return_sequences=True,
+                                         return_sequences=False,
                                          return_state=True,
                                          recurrent_initializer='glorot_uniform')
         self.concat1 = tf.keras.layers.Concatenate(axis=-1)
@@ -26,34 +26,20 @@ class Decoder(tf.keras.Model):
         self.optimizer = tf.keras.optimizers.Adam()
         self.attention = tf.keras.layers.Attention()
 
-    def __call__(self, x, context_vector, enc_output, states, enc_mask=None):
-        # hidden_state, cell_state = states
+    def __call__(self, x, states):
+        hidden_state, cell_state = states
         x = self.embedding(x)
         mask = x._keras_mask
-        x = tf.concat([x, context_vector], axis=-1)
+        x._keras_mask = None
+
         output, hidden_state, cell_state = self.lstm(x, initial_state=states)
+        output = output * tf.cast(mask, dtype=tf.float32)
         hidden_state = tf.where(mask, hidden_state, states[0])
         cell_state = tf.where(mask, cell_state, states[1])
-        output = output * tf.expand_dims(
-            tf.cast(mask, dtype=tf.float32), axis=2)
 
-        # Attention
-        x = tf.expand_dims(hidden_state, axis=1)
-        if enc_mask is None:
-            enc_mask = enc_output._keras_mask
-        context_vector = self.attention(inputs=[x, enc_output],
-                                        mask=[mask, enc_mask],
-                                        training=self.training)
-        x = self.concat2([output, context_vector])
-        output = tf.reshape(x, (-1, x.shape[2]))
-        context_shape = context_vector.shape
-        context_vector = tf.reshape(self.att(output), context_shape)
-
-        output = tf.keras.layers.Reshape(
-            (context_vector.shape[2],))(context_vector)
         x = self.out(output)
 
-        return x, context_vector, [hidden_state, cell_state], None
+        return x, [hidden_state, cell_state]
 
     def backward(self, loss, tape):
         variables = self.trainable_variables
