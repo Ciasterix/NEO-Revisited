@@ -73,14 +73,21 @@ class NeoOriginal:
     def train_step(self, inp, targ, targ_surrogate, enc_states):
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
-            enc_hidden, enc_cell = self.enc(inp, enc_states)
+            [enc_hidden, enc_cell], mean, logvar = self.enc(inp, enc_states)
+            # logpz = self.log_normal_pdf(enc_hidden, 0., 0.)
+            # logqz_x = self.log_normal_pdf(enc_hidden, mean, logvar)
+            kl_loss = self.kl_loss(mean, logvar)
+            # print(kl_loss)
+            # var_loss = -tf.reduce_mean(logpz + logqz_x)
+            var_loss = kl_loss
 
             surrogate_output = self.surrogate(enc_hidden)
             surrogate_loss = self.surrogate_loss_function(targ_surrogate,
                                                           surrogate_output)
 
             dec_hidden = enc_hidden
-            dec_cell = enc_cell
+            # dec_cell = enc_cell
+            dec_cell = self.dec.initialize_cell_state(len(dec_hidden))
             context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
 
             dec_input = tf.expand_dims([1] * len(inp), 1)
@@ -89,7 +96,6 @@ class NeoOriginal:
                 predictions, states = self.dec(dec_input, states)
                 autoencoder_loss += self.autoencoder_loss_function(
                     targ[:, t], predictions)
-
                 # Probabilistic teacher forcing
                 # (feeding the target as the next input)
                 if tf.random.uniform(
@@ -100,17 +106,19 @@ class NeoOriginal:
                         predictions, axis=1, output_type=tf.dtypes.int32)
                     dec_input = tf.expand_dims(pred_token, 1)
 
-            loss = autoencoder_loss + self.alpha * surrogate_loss
+            loss = autoencoder_loss + var_loss + self.alpha * surrogate_loss
 
         ae_loss_per_token = autoencoder_loss / int(targ.shape[1])
         batch_loss = ae_loss_per_token + self.alpha * surrogate_loss
         batch_ae_loss = (autoencoder_loss / int(targ.shape[1]))
+        batch_vae_loss = var_loss
         batch_surrogate_loss = surrogate_loss
 
         gradients, variables = self.backward(loss, tape)
+        # gradients = [tf.clip_by_norm(g, 1.0) for g in gradients]
         self.optimize(gradients, variables)
 
-        return batch_loss, batch_ae_loss, batch_surrogate_loss
+        return batch_loss, batch_ae_loss, batch_vae_loss, batch_surrogate_loss
 
     def backward(self, loss, tape):
         variables = \
@@ -129,6 +137,20 @@ class NeoOriginal:
     def update_latent(self, latent, gradients, eta):
         latent += eta * gradients
         return latent
+
+    def log_normal_pdf(self, sample, mean, logvar, raxis=1):
+        log2pi = tf.math.log(2. * np.pi)
+        return tf.reduce_sum(
+            -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
+            axis=raxis)
+
+    def kl_loss(self, mean, logvar):
+        # kl_loss = -0.5 * tf.reduce_mean(1 + logvar - mean ** 2 - tf.exp(logvar))
+        sigma_sq_enc = tf.square(tf.exp(logvar))
+        kl_loss = -.5 * tf.reduce_mean(tf.reduce_sum(
+            (1 + tf.math.log(1e-10 + sigma_sq_enc)) - tf.square(
+                mean) - sigma_sq_enc, axis=1), axis=0)
+        return kl_loss
 
     def autoencoder_loss_function(self, real, pred):
         mask = tf.math.logical_not(tf.math.equal(real, 0))
@@ -149,6 +171,7 @@ class NeoOriginal:
 
             total_loss = 0
             total_ae_loss = 0
+            total_vae_loss = 0
             total_surrogate_loss = 0
 
             data_generator = self.population()
@@ -157,10 +180,11 @@ class NeoOriginal:
                 enc_hidden = self.enc.initialize_hidden_state(batch_sz=len(inp))
                 enc_cell = self.enc.initialize_cell_state(batch_sz=len(inp))
                 enc_states = [enc_hidden, enc_cell]
-                batch_loss, batch_ae_loss, batch_surr_loss = self.train_step(
+                batch_loss, batch_ae_loss, batch_vae_loss, batch_surr_loss = self.train_step(
                     inp, targ, targ_surrogate, enc_states)
                 total_loss += batch_loss
                 total_ae_loss += batch_ae_loss
+                total_vae_loss += batch_vae_loss
                 total_surrogate_loss += batch_surr_loss
 
                 if False and self.verbose:
@@ -170,11 +194,13 @@ class NeoOriginal:
             if self.verbose and ((epoch + 1) % 10 == 0 or epoch == 0):
                 epoch_loss = total_loss / self.population.steps_per_epoch
                 ae_loss = total_ae_loss / self.population.steps_per_epoch
+                vae_loss = total_vae_loss / self.population.steps_per_epoch
                 surrogate_loss = \
                     total_surrogate_loss / self.population.steps_per_epoch
                 epoch_time = time.time() - start
                 print(f'Epoch {epoch + 1} Loss {epoch_loss:.6f} AE_loss '
-                      f'{ae_loss:.6f} Surrogate_loss '
+                      f'{ae_loss:.6f} VAE_loss '
+                      f'{vae_loss:.6f} Surrogate_loss '
                       f'{surrogate_loss:.6f} Time: {epoch_time:.3f}')
 
         # decrease number of epochs, but don't go below self.min_epochs
@@ -219,7 +245,8 @@ class NeoOriginal:
         gradients = self.surrogate_breed(surrogate_output, enc_hidden,
                                          tape)
         dec_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
-        dec_cell = enc_cell
+        # dec_cell = enc_cell
+        dec_cell = self.dec.initialize_cell_state(len(dec_hidden))
         context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
 
         dec_input = tf.expand_dims([1] * len(enc_hidden), 1)
@@ -282,6 +309,7 @@ class NeoOriginal:
 
     def breed(self):
         print("Breed")
+        self.enc.eval()
         self.dec.eval()
         data_generator = self.population(
             batch_size=len(self.population.samples))

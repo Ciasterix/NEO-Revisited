@@ -2,7 +2,8 @@ import tensorflow as tf
 
 
 class Decoder(tf.keras.Model):
-    def __init__(self, vocab_inp_size, vocab_tar_size, embedding_dim, dec_units, batch_sz):
+    def __init__(self, vocab_inp_size, vocab_tar_size, embedding_dim, dec_units,
+                 batch_sz):
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
@@ -13,12 +14,9 @@ class Decoder(tf.keras.Model):
                                          return_sequences=False,
                                          return_state=True,
                                          recurrent_initializer='glorot_uniform')
-        self.concat1 = tf.keras.layers.Concatenate(axis=-1)
-        self.concat2 = tf.keras.layers.Concatenate(axis=-1)
 
-        self.att = tf.keras.layers.Dense(self.dec_units,
-                                         activation="tanh",
-                                         use_bias=False)
+        self.latent_to_hidden = tf.keras.layers.Dense(self.dec_units, activation="tanh")
+
         self.out = tf.keras.layers.Dense(vocab_tar_size,
                                          activation="softmax",
                                          use_bias=False)
@@ -28,6 +26,8 @@ class Decoder(tf.keras.Model):
 
     def __call__(self, x, states):
         hidden_state, cell_state = states
+        hidden_state = self.latent_to_hidden(hidden_state)
+        states = [hidden_state, cell_state]
         x = self.embedding(x)
         mask = x._keras_mask
         x._keras_mask = None
@@ -40,6 +40,14 @@ class Decoder(tf.keras.Model):
         x = self.out(output)
 
         return x, [hidden_state, cell_state]
+
+    def initialize_cell_state(self, batch_sz=None):
+        if batch_sz is not None:
+            # return tf.random.normal(shape=[batch_sz, self.enc_units])
+            return tf.zeros((batch_sz, self.dec_units))
+        else:
+            # return tf.random.normal(shape=[batch_sz, self.enc_units])
+            return tf.zeros((self.batch_sz, self.dec_units))
 
     def backward(self, loss, tape):
         variables = self.trainable_variables

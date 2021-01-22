@@ -6,19 +6,31 @@ class Encoder(tf.keras.Model):
         super(Encoder, self).__init__()
         self.batch_sz = batch_sz
         self.enc_units = enc_units
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim, mask_zero=True)
+        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim,
+                                                   mask_zero=True)
         self.lstm = tf.keras.layers.LSTM(self.enc_units,
-                                       return_sequences=False,
-                                       return_state=True,
-                                       recurrent_initializer='glorot_uniform')
-        self.bn_hidden = tf.keras.layers.BatchNormalization()
+                                         return_sequences=False,
+                                         return_state=True,
+                                         recurrent_initializer='glorot_uniform')
+        self.latent_mean = tf.keras.layers.Dense(self.enc_units)
+        self.latent_logvar = tf.keras.layers.Dense(self.enc_units)
 
         self.optimizer = tf.keras.optimizers.Adam()
 
     def __call__(self, x, states):
         x = self.embedding(x)
-        output, hidden_state, cell_state = self.lstm(x, initial_state=states)
-        return hidden_state, cell_state
+        _, hidden_state, cell_state = self.lstm(x, initial_state=states)
+        mean = self.latent_mean(hidden_state)
+        logvar = self.latent_logvar(hidden_state)
+        hidden_state = self._reparameterize(mean, logvar)
+        if self.training:
+            return [hidden_state, cell_state], mean, logvar
+        else:
+            return hidden_state, cell_state
+
+    def _reparameterize(self, mean, logvar):
+        eps = tf.random.normal(shape=mean.shape)
+        return eps * tf.exp(logvar * .5) + mean
 
     def initialize_hidden_state(self, batch_sz=None):
         if batch_sz is not None:
@@ -52,6 +64,7 @@ class Encoder(tf.keras.Model):
 
     def eval(self):
         self.training = False
+
 
 if __name__ == "__main__":
     BATCH_SIZE = 256
