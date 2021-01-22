@@ -16,6 +16,7 @@ class Decoder(tf.keras.Model):
                                          recurrent_initializer='glorot_uniform')
 
         self.latent_to_hidden = tf.keras.layers.Dense(self.dec_units, activation="tanh")
+        self.bn = tf.keras.layers.BatchNormalization()
 
         self.out = tf.keras.layers.Dense(vocab_tar_size,
                                          activation="softmax",
@@ -27,6 +28,7 @@ class Decoder(tf.keras.Model):
     def __call__(self, x, states):
         hidden_state, cell_state = states
         hidden_state = self.latent_to_hidden(hidden_state)
+        hidden_state = self.bn(hidden_state, training=self.training)
         states = [hidden_state, cell_state]
         x = self.embedding(x)
         mask = x._keras_mask

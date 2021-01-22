@@ -14,6 +14,7 @@ class Encoder(tf.keras.Model):
                                          recurrent_initializer='glorot_uniform')
         self.latent_mean = tf.keras.layers.Dense(self.enc_units)
         self.latent_logvar = tf.keras.layers.Dense(self.enc_units)
+        self.bn = tf.keras.layers.BatchNormalization()
 
         self.optimizer = tf.keras.optimizers.Adam()
 
@@ -23,6 +24,7 @@ class Encoder(tf.keras.Model):
         mean = self.latent_mean(hidden_state)
         logvar = self.latent_logvar(hidden_state)
         hidden_state = self._reparameterize(mean, logvar)
+        hidden_state = self.bn(hidden_state, training=self.training)
         if self.training:
             return [hidden_state, cell_state], mean, logvar
         else:

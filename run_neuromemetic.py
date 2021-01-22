@@ -118,10 +118,10 @@ if __name__ == "__main__":
         vocab_inp_size=15,
         vocab_tar_size=15,
         embedding_dim=64,
-        units=128,
-        hidden_size=128,
+        units=256,
+        hidden_size=256,
         alpha=0.8,
-        epochs=200,
+        epochs=5000,
         epoch_decay=1,
         min_epochs=10,
         verbose=True

@@ -46,7 +46,7 @@ class NeoOriginal:
         self.population = Population(pset, max_size, batch_size)
         self.prob = 0.5
 
-        self.optimizer = tf.keras.optimizers.Adam()
+        self.optimizer = tf.keras.optimizers.Adam(lr=0.001)
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=False, reduction='none')
 
@@ -69,7 +69,7 @@ class NeoOriginal:
         self.surrogate.load_weights(
             "model/weights/surrogate/surrogate_{}".format(train_steps))
 
-    # @tf.function
+    @tf.function
     def train_step(self, inp, targ, targ_surrogate, enc_states):
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
@@ -109,7 +109,7 @@ class NeoOriginal:
             loss = autoencoder_loss + var_loss + self.alpha * surrogate_loss
 
         ae_loss_per_token = autoencoder_loss / int(targ.shape[1])
-        batch_loss = ae_loss_per_token + self.alpha * surrogate_loss
+        batch_loss = ae_loss_per_token + var_loss + self.alpha * surrogate_loss
         batch_ae_loss = (autoencoder_loss / int(targ.shape[1]))
         batch_vae_loss = var_loss
         batch_surrogate_loss = surrogate_loss
@@ -145,11 +145,12 @@ class NeoOriginal:
             axis=raxis)
 
     def kl_loss(self, mean, logvar):
-        # kl_loss = -0.5 * tf.reduce_mean(1 + logvar - mean ** 2 - tf.exp(logvar))
-        sigma_sq_enc = tf.square(tf.exp(logvar))
-        kl_loss = -.5 * tf.reduce_mean(tf.reduce_sum(
-            (1 + tf.math.log(1e-10 + sigma_sq_enc)) - tf.square(
-                mean) - sigma_sq_enc, axis=1), axis=0)
+        kl_loss = -0.5 * tf.reduce_mean(1 + logvar - mean ** 2 - tf.exp(logvar))
+
+        # sigma_sq_enc = tf.square(tf.exp(logvar))
+        # kl_loss = -.5 * tf.reduce_mean(tf.reduce_sum(
+        #     (1 + tf.math.log(1e-10 + sigma_sq_enc)) - tf.square(
+        #         mean) - sigma_sq_enc, axis=1), axis=0)
         return kl_loss
 
     def autoencoder_loss_function(self, real, pred):
