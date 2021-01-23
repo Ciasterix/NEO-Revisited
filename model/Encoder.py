@@ -8,27 +8,30 @@ class Encoder(tf.keras.Model):
         self.enc_units = enc_units
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim,
                                                    mask_zero=True)
+        # self.lstm1 = tf.keras.layers.LSTM(self.enc_units,
+        #                                  return_sequences=True,
+        #                                  return_state=False,
+        #                                  recurrent_initializer='glorot_uniform')
         self.lstm = tf.keras.layers.LSTM(self.enc_units,
                                          return_sequences=False,
                                          return_state=True,
                                          recurrent_initializer='glorot_uniform')
         self.latent_mean = tf.keras.layers.Dense(self.enc_units)
         self.latent_logvar = tf.keras.layers.Dense(self.enc_units)
-        self.bn = tf.keras.layers.BatchNormalization()
+        # self.bn = tf.keras.layers.BatchNormalization()
 
-        self.optimizer = tf.keras.optimizers.Adam()
-
-    def __call__(self, x, states):
+    def __call__(self, x):
         x = self.embedding(x)
-        _, hidden_state, cell_state = self.lstm(x, initial_state=states)
-        mean = self.latent_mean(hidden_state)
-        logvar = self.latent_logvar(hidden_state)
-        hidden_state = self._reparameterize(mean, logvar)
-        # hidden_state = self.bn(hidden_state, training=self.training)
+        output, hidden_state, cell_state = self.lstm(x)
+        states = [hidden_state, cell_state]
+
+        mean = self.latent_mean(output)
+        logvar = self.latent_logvar(output)
+        latent = self._reparameterize(mean, logvar)
         if self.training:
-            return [hidden_state, cell_state], mean, logvar
+            return latent, mean, logvar
         else:
-            return hidden_state, cell_state
+            return latent
 
     def _reparameterize(self, mean, logvar):
         eps = tf.random.normal(shape=mean.shape)

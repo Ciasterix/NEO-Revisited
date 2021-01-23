@@ -113,7 +113,7 @@ if __name__ == "__main__":
     stats = benchmarks.standard_statistics()
     neural_model = NeoOriginal(
         pset,
-        batch_size=256,
+        batch_size=64,
         max_size=40,
         vocab_inp_size=15,
         vocab_tar_size=15,
@@ -121,7 +121,7 @@ if __name__ == "__main__":
         units=128,
         hidden_size=256,
         alpha=0.8,
-        epochs=5000,
+        epochs=10,
         epoch_decay=1,
         min_epochs=10,
         verbose=True
