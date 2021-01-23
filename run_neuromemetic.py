@@ -118,7 +118,7 @@ if __name__ == "__main__":
         vocab_inp_size=15,
         vocab_tar_size=15,
         embedding_dim=64,
-        units=256,
+        units=128,
         hidden_size=256,
         alpha=0.8,
         epochs=5000,

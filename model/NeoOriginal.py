@@ -48,7 +48,7 @@ class NeoOriginal:
 
         self.optimizer = tf.keras.optimizers.Adam(lr=0.001)
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=False, reduction='none')
+            from_logits=True, reduction='none')
 
     def save_models(self):
         self.enc.save_weights(
@@ -69,17 +69,14 @@ class NeoOriginal:
         self.surrogate.load_weights(
             "model/weights/surrogate/surrogate_{}".format(train_steps))
 
-    @tf.function
+    # @tf.function
     def train_step(self, inp, targ, targ_surrogate, enc_states):
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
             [enc_hidden, enc_cell], mean, logvar = self.enc(inp, enc_states)
-            # logpz = self.log_normal_pdf(enc_hidden, 0., 0.)
-            # logqz_x = self.log_normal_pdf(enc_hidden, mean, logvar)
-            kl_loss = self.kl_loss(mean, logvar)
-            # print(kl_loss)
-            # var_loss = -tf.reduce_mean(logpz + logqz_x)
-            var_loss = kl_loss
+            logpz = self.log_normal_pdf(enc_hidden, 0., 0.)
+            logqz_x = self.log_normal_pdf(enc_hidden, mean, logvar)
+            vae_loss = logpz - logqz_x
 
             surrogate_output = self.surrogate(enc_hidden)
             surrogate_loss = self.surrogate_loss_function(targ_surrogate,
@@ -106,18 +103,19 @@ class NeoOriginal:
                         predictions, axis=1, output_type=tf.dtypes.int32)
                     dec_input = tf.expand_dims(pred_token, 1)
 
-            loss = autoencoder_loss + var_loss + self.alpha * surrogate_loss
+            loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
 
-        ae_loss_per_token = autoencoder_loss / int(targ.shape[1])
-        batch_loss = ae_loss_per_token + var_loss + self.alpha * surrogate_loss
-        batch_ae_loss = (autoencoder_loss / int(targ.shape[1]))
-        batch_vae_loss = var_loss
+        # ae_loss_per_token = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
+        batch_loss = loss
+        # batch_loss = -tf.reduce_mean(autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
+        batch_ae_loss = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
+        batch_vae_loss = tf.reduce_mean(vae_loss)
         batch_surrogate_loss = surrogate_loss
 
         gradients, variables = self.backward(loss, tape)
         # gradients = [tf.clip_by_norm(g, 1.0) for g in gradients]
         self.optimize(gradients, variables)
-
+        # print(batch_loss.shape, batch_ae_loss.shape, batch_vae_loss.shape, batch_surrogate_loss.shape)
         return batch_loss, batch_ae_loss, batch_vae_loss, batch_surrogate_loss
 
     def backward(self, loss, tape):
@@ -156,9 +154,14 @@ class NeoOriginal:
     def autoencoder_loss_function(self, real, pred):
         mask = tf.math.logical_not(tf.math.equal(real, 0))
         loss_ = self.loss_object(real, pred)
+        # loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred)
         mask = tf.cast(mask, dtype=loss_.dtype)
-        loss_ *= mask
-        return tf.reduce_mean(loss_)
+        # loss_ *= mask
+        # loss_1 *= mask
+        # print("l", tf.reduce_sum(loss_))
+        # print("l1", tf.reduce_sum(loss_1))
+        # return tf.reduce_mean(loss_)
+        return loss_
 
     def surrogate_loss_function(self, real, pred):
         loss_ = tf.keras.losses.mean_squared_error(real, pred)

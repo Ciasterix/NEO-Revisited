@@ -19,7 +19,6 @@ class Decoder(tf.keras.Model):
         self.bn = tf.keras.layers.BatchNormalization()
 
         self.out = tf.keras.layers.Dense(vocab_tar_size,
-                                         activation="softmax",
                                          use_bias=False)
 
         self.optimizer = tf.keras.optimizers.Adam()
@@ -28,7 +27,7 @@ class Decoder(tf.keras.Model):
     def __call__(self, x, states):
         hidden_state, cell_state = states
         hidden_state = self.latent_to_hidden(hidden_state)
-        hidden_state = self.bn(hidden_state, training=self.training)
+        # hidden_state = self.bn(hidden_state, training=self.training)
         states = [hidden_state, cell_state]
         x = self.embedding(x)
         mask = x._keras_mask

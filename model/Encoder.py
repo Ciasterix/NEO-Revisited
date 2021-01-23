@@ -24,7 +24,7 @@ class Encoder(tf.keras.Model):
         mean = self.latent_mean(hidden_state)
         logvar = self.latent_logvar(hidden_state)
         hidden_state = self._reparameterize(mean, logvar)
-        hidden_state = self.bn(hidden_state, training=self.training)
+        # hidden_state = self.bn(hidden_state, training=self.training)
         if self.training:
             return [hidden_state, cell_state], mean, logvar
         else:
