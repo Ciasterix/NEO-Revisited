@@ -71,13 +71,14 @@ class NeoOriginal:
             "{}/surrogate/surrogate_{}".format(self.save_path, self.train_steps),
             save_format="tf")
 
-    def load_models(self, train_steps):
+    def load_models(self, path, train_steps):
+        path = "model/weights/{}".format(path)
         self.enc.load_weights(
-            "model/weights/encoder/enc_{}".format(train_steps))
+            "{}/encoder/enc_{}".format(path, train_steps))
         self.dec.load_weights(
-            "model/weights/decoder/dec_{}".format(train_steps))
+            "{}/decoder/dec_{}".format(path, train_steps))
         self.surrogate.load_weights(
-            "model/weights/surrogate/surrogate_{}".format(train_steps))
+            "{}/surrogate/surrogate_{}".format(path, train_steps))
 
     # @tf.function
     def train_step(self, inp, targ, targ_surrogate):
