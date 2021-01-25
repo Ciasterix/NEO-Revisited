@@ -117,7 +117,7 @@ class NeoOriginal:
                     token = tf.expand_dims(pred_token, 1)
             # vae_loss = 0
             # scaling_factor = min(1, (self.epoch + 1) / (self.epochs / 10))
-            scaling_factor = self.sigmoid(self.epoch, center=self.epochs/10)
+            scaling_factor = self.sigmoid(self.epoch, center=self.epochs/10, squash=100)
             vae_loss *= scaling_factor
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
             loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
