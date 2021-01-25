@@ -16,7 +16,7 @@ class Encoder(tf.keras.Model):
                                          return_sequences=False,
                                          return_state=False,
                                          recurrent_initializer='glorot_uniform')
-        self.bi_lstm = tf.keras.layers.Bidirectional(self.lstm)
+        # self.bi_lstm = tf.keras.layers.Bidirectional(self.lstm)
         self.latent_mean = tf.keras.layers.Dense(self.enc_units)
         self.latent_logvar = tf.keras.layers.Dense(self.enc_units)
         # self.bn = tf.keras.layers.BatchNormalization()
@@ -25,7 +25,7 @@ class Encoder(tf.keras.Model):
         x = self.embedding(x)
         # x = self.lstm1(x)
         # x = self.lstm2(x)
-        output = self.bi_lstm(x)
+        output = self.lstm(x)
         mean = self.latent_mean(output)
         logvar = self.latent_logvar(output)
         latent = self._reparameterize(mean, logvar)
