@@ -84,29 +84,26 @@ class NeoOriginal:
 
             # dec_hidden = enc_hidden
             # dec_cell = enc_cell
-            # dec_hidden = self.dec.initialize_hidden_state(len(inp))
-            # dec_cell = self.dec.initialize_cell_state(len(inp))
+            dec_hidden = self.dec.initialize_hidden_state(len(inp))
+            dec_cell = self.dec.initialize_cell_state(len(inp))
+            states = [dec_hidden, dec_cell]
             # context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
 
-            dec_input = tf.expand_dims([1] * len(inp), 1)
-            predictions = self.dec(latent, self.max_size-1)
-            autoencoder_loss += self.autoencoder_loss_function(
-                targ[:, 1:], predictions
-            )
+            token = tf.expand_dims([1] * len(inp), 1)
+            latent = tf.expand_dims(latent, axis=1)
 
-            # for t in range(1, self.max_size):
-            #     predictions, states = self.dec(dec_input, latent, states)
-            #     autoencoder_loss += self.autoencoder_loss_function(
-            #         targ[:, t], predictions)
-            #     # Probabilistic teacher forcing
-            #     # (feeding the target as the next input)
-            #     if tf.random.uniform(
-            #             shape=[], maxval=1, dtype=tf.float32) > self.prob:
-            #         dec_input = tf.expand_dims(targ[:, t], 1)
-            #     else:
-            #         pred_token = tf.argmax(
-            #             predictions, axis=1, output_type=tf.dtypes.int32)
-            #         dec_input = tf.expand_dims(pred_token, 1)
+            for t in range(1, self.max_size):
+                predictions, states = self.dec(token, latent, states)
+                autoencoder_loss += self.autoencoder_loss_function(
+                    targ[:, t], predictions)
+                # Probabilistic teacher forcing
+                # (feeding the target as the next input)
+                if tf.random.uniform(shape=[]) > self.prob:
+                    token = tf.expand_dims(targ[:, t], 1)
+                else:
+                    pred_token = tf.argmax(
+                        predictions, axis=1, output_type=tf.dtypes.int32)
+                    token = tf.expand_dims(pred_token, 1)
 
             vae_loss = 0
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
@@ -251,25 +248,22 @@ class NeoOriginal:
         gradients = self.surrogate_breed(surrogate_output, latent,
                                          tape)
         latent = self.update_latent(latent, gradients, eta=eta)
-        # dec_cell = enc_cell
-        # dec_cell = self.dec.initialize_cell_state(len(dec_hidden))
-        # context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
 
-        dec_input = tf.expand_dims([1] * len(latent), 1)
+        dec_hidden = self.dec.initialize_hidden_state(len(latent))
+        dec_cell = self.dec.initialize_cell_state(len(latent))
 
-        # child = dec_input
-        # states = [dec_hidden, dec_cell]
-        predictions = self.dec(latent, self.max_size - 2)
-        # predictions shape: (batch, max_size-2, layer_dim)
-        predicted_tokens = tf.argmax(predictions, axis=2, output_type=tf.dtypes.int32)
-        # for _ in range(1, self.max_size - 1):
-        #     predictions, states = self.dec(latent, self.max_size-1)
-        #     dec_input = tf.expand_dims(
-        #         tf.argmax(predictions, axis=1, output_type=tf.dtypes.int32), 1)
-        #     child = tf.concat([child, dec_input], axis=1)
+        token = tf.expand_dims([1] * len(latent), 1)
+        latent = tf.expand_dims(latent, axis=1)
+
+        child = token
+        states = [dec_hidden, dec_cell]
+        for _ in range(1, self.max_size - 1):
+            predictions, states = self.dec(token, latent, states)
+            token = tf.expand_dims(
+                tf.argmax(predictions, axis=1, output_type=tf.dtypes.int32), 1)
+            child = tf.concat([child, token], axis=1)
         stop_tokens = tf.expand_dims([2] * len(latent), 1)
-        child = tf.concat([dec_input,
-                           predicted_tokens,
+        child = tf.concat([child,
                            stop_tokens], axis=1)
         return child
 
