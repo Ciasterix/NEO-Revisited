@@ -1,6 +1,8 @@
 import time
 
+import datetime
 import deap
+import os
 import numpy as np
 import tensorflow as tf
 
@@ -46,19 +48,27 @@ class NeoOriginal:
         self.population = Population(pset, max_size, batch_size)
         self.prob = 0.5
 
-        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.optimizer = tf.keras.optimizers.Adam(lr=1e-3)
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=True, reduction='none')
+        self.save_path = ""
 
     def save_models(self):
+        if self.save_path == "":
+            timestamp = "_".join(str(datetime.datetime.now()).split())
+            self.save_path = "model/weights/{}".format(timestamp)
+            os.mkdir(self.save_path)
+            os.mkdir("{}/encoder".format(self.save_path))
+            os.mkdir("{}/decoder".format(self.save_path))
+            os.mkdir("{}/surrogate".format(self.save_path))
         self.enc.save_weights(
-            "model/weights/encoder/enc_{}".format(self.train_steps),
+            "{}/encoder/enc_{}".format(self.save_path, self.train_steps),
             save_format="tf")
         self.dec.save_weights(
-            "model/weights/decoder/dec_{}".format(self.train_steps),
+            "{}/decoder/dec_{}".format(self.save_path, self.train_steps),
             save_format="tf")
         self.surrogate.save_weights(
-            "model/weights/surrogate/surrogate_{}".format(self.train_steps),
+            "{}/surrogate/surrogate_{}".format(self.save_path, self.train_steps),
             save_format="tf")
 
     def load_models(self, train_steps):
@@ -69,7 +79,7 @@ class NeoOriginal:
         self.surrogate.load_weights(
             "model/weights/surrogate/surrogate_{}".format(train_steps))
 
-    # @tf.function
+    @tf.function
     def train_step(self, inp, targ, targ_surrogate):
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
@@ -104,15 +114,18 @@ class NeoOriginal:
                     pred_token = tf.argmax(
                         predictions, axis=1, output_type=tf.dtypes.int32)
                     token = tf.expand_dims(pred_token, 1)
-
-            vae_loss = 0
+            # vae_loss = 0
+            # scaling_factor = 1 - (self.epoch + 1) / self.epochs
+            # vae_loss *= scaling_factor
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
+            # loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
+            # loss = -tf.reduce_mean(0*autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
 
         # ae_loss_per_token = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
         batch_loss = loss
         # batch_loss = -tf.reduce_mean(autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
         batch_ae_loss = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
-        batch_vae_loss = tf.reduce_mean(vae_loss)
+        batch_vae_loss = -tf.reduce_mean(vae_loss)
         batch_surrogate_loss = surrogate_loss
 
         gradients, variables = self.backward(loss, tape)
@@ -157,14 +170,13 @@ class NeoOriginal:
     def autoencoder_loss_function(self, real, pred):
         mask = tf.math.logical_not(tf.math.equal(real, 0))
         loss_ = self.loss_object(real, pred)
+        target_weights = tf.constant(np.ones(pred.shape[0:2]), tf.float32)
         # loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred)
         mask = tf.cast(mask, dtype=loss_.dtype)
         # loss_ *= mask
         # loss_1 *= mask
-        # print("l", tf.reduce_sum(loss_))
-        # print("l1", tf.reduce_sum(loss_1))
         # return tf.reduce_mean(loss_)
-        return loss_
+        return tf.reduce_sum(loss_, axis=1)
 
     def surrogate_loss_function(self, real, pred):
         loss_ = tf.keras.losses.mean_squared_error(real, pred)
@@ -195,7 +207,7 @@ class NeoOriginal:
                     print(f'Epoch {epoch + 1} Batch {batch} '
                           f'Loss {batch_loss.numpy():.4f}')
 
-            if self.verbose and ((epoch + 1) % 10 == 0 or epoch == 0):
+            if self.verbose and ((epoch + 1) % 100 == 0 or epoch == 0):
                 epoch_loss = total_loss / self.population.steps_per_epoch
                 ae_loss = total_ae_loss / self.population.steps_per_epoch
                 vae_loss = total_vae_loss / self.population.steps_per_epoch
@@ -211,7 +223,7 @@ class NeoOriginal:
         self.epochs = max(self.epochs - self.epoch_decay, self.min_epochs)
 
     def _gen_children(
-            self, candidates, latent, max_eta=1000):
+            self, candidates, latent, max_eta=2000):
         children = []
         eta = 0
         last_copy_ind = len(candidates)
@@ -267,8 +279,10 @@ class NeoOriginal:
                            stop_tokens], axis=1)
         return child
 
-    def cut_seq(self, seq, end_token=2):
-        ind = (seq == end_token).argmax(1)
+    def cut_seq(self, seq, end_token=2, pad_token=0):
+        end_token_ind = (seq == end_token).argmax(1)
+        pad_token_ind = (seq == pad_token).argmax(1)
+        ind = np.minimum(end_token_ind, pad_token_ind)
         res = []
         tree_max = []
         for d, i in zip(seq, ind):

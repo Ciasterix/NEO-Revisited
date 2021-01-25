@@ -19,6 +19,7 @@ class Decoder(tf.keras.Model):
                                          return_sequences=False,
                                          return_state=True,
                                          recurrent_initializer='glorot_uniform')
+        self.bi_lstm = tf.keras.layers.Bidirectional(self.lstm)
 
         # self.latent_to_hidden = tf.keras.layers.Dense(self.dec_units, activation="tanh")
         # self.bn = tf.keras.layers.BatchNormalization()

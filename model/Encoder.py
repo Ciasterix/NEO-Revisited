@@ -14,20 +14,23 @@ class Encoder(tf.keras.Model):
         #                                  recurrent_initializer='glorot_uniform')
         self.lstm = tf.keras.layers.LSTM(self.enc_units,
                                          return_sequences=False,
-                                         return_state=True,
+                                         return_state=False,
                                          recurrent_initializer='glorot_uniform')
+        self.bi_lstm = tf.keras.layers.Bidirectional(self.lstm)
         self.latent_mean = tf.keras.layers.Dense(self.enc_units)
         self.latent_logvar = tf.keras.layers.Dense(self.enc_units)
         # self.bn = tf.keras.layers.BatchNormalization()
 
     def __call__(self, x):
         x = self.embedding(x)
-        output, hidden_state, cell_state = self.lstm(x)
-        states = [hidden_state, cell_state]
-
+        # x = self.lstm1(x)
+        # x = self.lstm2(x)
+        output = self.bi_lstm(x)
         mean = self.latent_mean(output)
         logvar = self.latent_logvar(output)
         latent = self._reparameterize(mean, logvar)
+        # latent = output
+        # mean, logvar = 0., 0.
         if self.training:
             return latent, mean, logvar
         else:
