@@ -1,8 +1,8 @@
+import datetime
+import os
 import time
 
-import datetime
 import deap
-import os
 import numpy as np
 import tensorflow as tf
 
@@ -79,7 +79,7 @@ class NeoOriginal:
         self.surrogate.load_weights(
             "model/weights/surrogate/surrogate_{}".format(train_steps))
 
-    @tf.function
+    # @tf.function
     def train_step(self, inp, targ, targ_surrogate):
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
@@ -170,13 +170,12 @@ class NeoOriginal:
     def autoencoder_loss_function(self, real, pred):
         mask = tf.math.logical_not(tf.math.equal(real, 0))
         loss_ = self.loss_object(real, pred)
-        target_weights = tf.constant(np.ones(pred.shape[0:2]), tf.float32)
         # loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred)
         mask = tf.cast(mask, dtype=loss_.dtype)
         # loss_ *= mask
         # loss_1 *= mask
         # return tf.reduce_mean(loss_)
-        return tf.reduce_sum(loss_, axis=1)
+        return loss_
 
     def surrogate_loss_function(self, real, pred):
         loss_ = tf.keras.losses.mean_squared_error(real, pred)
