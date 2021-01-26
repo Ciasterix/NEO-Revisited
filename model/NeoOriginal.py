@@ -160,7 +160,7 @@ class NeoOriginal:
             -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
             axis=raxis)
 
-    def sigmoid(x, center=0, squash=1):
+    def sigmoid(self, x, center=0, squash=1):
         return 1.0 / (1 + np.exp(-(x-center) / squash))
 
     def kl_loss(self, mean, logvar):
