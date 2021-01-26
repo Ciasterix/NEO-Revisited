@@ -12,6 +12,10 @@ def save_population(offspring, path):
         for o in offspring:
             f.write(str(o) + '\n')
 
+def save_log(log, path):
+    with open(path, 'a') as f:
+        f.write(str(log) + '\n')
+
 
 def memetic_algorithm(population, toolbox, ngen, model, stats=None,
                       halloffame=None, verbose=__debug__):
@@ -45,20 +49,26 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     record = stats.compile(population) if stats else {}
     logbook.record(gen=0, nevals=len(invalid_ind), **record)
     if verbose:
-        print(logbook.stream)
+        log_stream = logbook.stream
+        print(log_stream)
+        save_log(log_stream, "logs/vae.log")
 
     save_population(population, f"offsprings/0_pop_start.txt")
+
+    model_name = "2021-01-26_14:37:11.684085"
+    model.load_models(model_name, 0)
 
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # max((epochs - 1, 10))
         # Select the next generation individuals
-        offspring = toolbox.select(population, len(population))
+        # offspring = toolbox.select(population, len(population))
+        offspring = population
         save_population(offspring, f"offsprings/sel_{gen}.txt")
-        model.population.update(offspring)
+        model.population.update(offspring, gen)
 
         # Training neural model
-        model.update()
+        # model.update()
 
         # Breeding neural model
         offspring = model.breed()
@@ -86,7 +96,9 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
         record = stats.compile(population) if stats else {}
         logbook.record(gen=gen, nevals=len(invalid_ind), **record)
         if verbose:
-            print(logbook.stream)
+            log_stream = logbook.stream
+            print(log_stream)
+            save_log(log_stream, "logs/vae.log")
 
         if halloffame[0].fitness.getValues()[0] == 1:
             break
@@ -118,12 +130,12 @@ if __name__ == "__main__":
         vocab_inp_size=15,
         vocab_tar_size=15,
         embedding_dim=64,
-        units=128,
+        units=256,
         hidden_size=256,
         alpha=0.8,
-        epochs=10,
-        epoch_decay=1,
-        min_epochs=10,
+        epochs=5000,
+        epoch_decay=5000,
+        min_epochs=0,
         verbose=True
     )
     memetic_algorithm(pop, toolbox, NUM_GEN, neural_model, stats, hof)

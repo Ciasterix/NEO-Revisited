@@ -27,15 +27,20 @@ class Population:
             target_surrogate_batch = tf.constant(self.fitness[idx:n_idx])
             yield input_batch, target_batch, target_surrogate_batch
 
-    def update(self, offspring):
+    def update(self, offspring, gen):
         self.samples = [self.tokenizer.tokenize_tree(str(p)) for p in
                          offspring]
         len = (np.array(self.samples) == 2).argmax(1) + 1
         print("Min, Mean, Max:", np.min(len), np.mean(len), np.max(len))
         # print("Update shape", np.array(self.samples).shape)
         self.fitness = [p.fitness.values for p in offspring]
-        # self.
+        self.save_pop(self.samples, self.fitness, gen)
 
+    def save_pop(self, samples, fitness, gen):
+        with open("population/samples_{}".format(gen), "wb") as f:
+            np.save(f, np.array(samples))
+        with open("population/fitness_{}".format(gen), "wb") as f:
+            np.save(f, np.array(fitness))
 
 if __name__ == "__main__":
     samples = np.random.randn(1000, 64)

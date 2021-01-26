@@ -89,7 +89,7 @@ class NeoOriginal:
             logqz_x = self.log_normal_pdf(latent, mean, logvar)
             vae_loss = logpz - logqz_x
 
-            surrogate_output = self.surrogate(latent)
+            surrogate_output = self.surrogate(mean)
             surrogate_loss = self.surrogate_loss_function(targ_surrogate,
                                                           surrogate_output)
 
@@ -120,7 +120,7 @@ class NeoOriginal:
             scaling_factor = self.sigmoid(self.epoch, center=self.epochs/10, squash=100)
             vae_loss *= scaling_factor
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
-            loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
+            # loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
             # loss = -tf.reduce_mean(0*autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
 
         # ae_loss_per_token = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
@@ -227,7 +227,7 @@ class NeoOriginal:
         self.epochs = max(self.epochs - self.epoch_decay, self.min_epochs)
 
     def _gen_children(
-            self, candidates, latent, max_eta=2000):
+            self, candidates, latent, max_eta=1000):
         children = []
         eta = 0
         last_copy_ind = len(candidates)
@@ -315,8 +315,8 @@ class NeoOriginal:
         return new_ind, copy_ind
 
     def _gen_latents(self, candidates):
-        latents = self.enc(candidates)
-        return latents
+        latents, mean, logvar = self.enc(candidates)
+        return mean
 
     def update(self):
         print("Training")

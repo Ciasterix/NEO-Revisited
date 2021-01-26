@@ -9,6 +9,7 @@ class Surrogate(tf.keras.Model):
         super(Surrogate, self).__init__()
         self.fc1 = tf.keras.layers.Dense(hidden_size, activation="relu")
         self.fc2 = tf.keras.layers.Dense(hidden_size, activation="relu")
+        self.fc3 = tf.keras.layers.Dense(hidden_size, activation="relu")
         self.out = tf.keras.layers.Dense(1, activation="sigmoid")
 
         self.attention = Attention()
@@ -18,6 +19,7 @@ class Surrogate(tf.keras.Model):
     def __call__(self, hidden_state):
         x = self.fc1(hidden_state)
         x = self.fc2(x)
+        x = self.fc3(x)
         x = self.out(x)
         return x
 
