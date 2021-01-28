@@ -39,6 +39,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
 
+
     if halloffame is not None:
         halloffame.update(population)
 
@@ -47,12 +48,13 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     if verbose:
         print(logbook.stream)
 
-    save_population(population, f"offsprings/0_pop_start.txt")
-
+    # save_population(population, f"offsprings/0_pop_start.txt")
+    # model.load_models("2021-01-26_00:28:36.715372", 0)
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # max((epochs - 1, 10))
         # Select the next generation individuals
+        # offspring = population
         offspring = toolbox.select(population, len(population))
         save_population(offspring, f"offsprings/sel_{gen}.txt")
         model.population.update(offspring)
@@ -121,7 +123,7 @@ if __name__ == "__main__":
         units=128,
         hidden_size=256,
         alpha=0.8,
-        epochs=10,
+        epochs=1,
         epoch_decay=1,
         min_epochs=10,
         verbose=True

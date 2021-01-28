@@ -51,6 +51,7 @@ class NeoOriginal:
         self.optimizer = tf.keras.optimizers.Adam(lr=1e-3)
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=True, reduction='none')
+        self.surrogate_object = tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction='none')
         self.save_path = ""
 
     def save_models(self):
@@ -89,7 +90,7 @@ class NeoOriginal:
             logqz_x = self.log_normal_pdf(latent, mean, logvar)
             vae_loss = logpz - logqz_x
 
-            surrogate_output = self.surrogate(latent)
+            surrogate_output = self.surrogate(mean)
             surrogate_loss = self.surrogate_loss_function(targ_surrogate,
                                                           surrogate_output)
 
@@ -180,6 +181,7 @@ class NeoOriginal:
 
     def surrogate_loss_function(self, real, pred):
         loss_ = tf.keras.losses.mean_squared_error(real, pred)
+        # loss_ = self.surrogate_object(real, pred)
         return tf.reduce_mean(loss_)
 
     def __train(self):
@@ -311,8 +313,8 @@ class NeoOriginal:
         return new_ind, copy_ind
 
     def _gen_latents(self, candidates):
-        latents = self.enc(candidates)
-        return latents
+        latents, mean, logvar = self.enc(candidates)
+        return mean
 
     def update(self):
         print("Training")

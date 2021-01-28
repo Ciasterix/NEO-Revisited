@@ -3,6 +3,7 @@ from math import ceil
 import numpy as np
 import tensorflow as tf
 
+from benchmarks import MajSemantic
 from utils import TreeTokenizer
 
 
@@ -10,6 +11,7 @@ class Population:
     def __init__(self, pset, max_size, batch_size):
         self.batch_size = batch_size
         self.tokenizer = TreeTokenizer(pset, max_size)
+        self.task_semantic = MajSemantic(pset)
 
     def __call__(self, batch_size=None):
         if batch_size is None:
@@ -24,7 +26,7 @@ class Population:
             n_idx = i * batch_size
             input_batch = tf.constant(self.samples[idx:n_idx])
             target_batch = input_batch
-            target_surrogate_batch = tf.constant(self.fitness[idx:n_idx])
+            target_surrogate_batch = tf.constant(self.fitness[idx:n_idx], dtype=tf.float32)
             yield input_batch, target_batch, target_surrogate_batch
 
     def update(self, offspring):
@@ -33,7 +35,10 @@ class Population:
         len = (np.array(self.samples) == 2).argmax(1) + 1
         print("Min, Mean, Max:", np.min(len), np.mean(len), np.max(len))
         # print("Update shape", np.array(self.samples).shape)
-        self.fitness = [p.fitness.values for p in offspring]
+
+
+        self.fitness = [self.task_semantic(o) for o in offspring]
+        # print(self.fitness)
         # self.
 
 
