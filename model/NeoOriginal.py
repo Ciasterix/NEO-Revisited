@@ -81,7 +81,7 @@ class NeoOriginal:
         self.surrogate.load_weights(
             "{}/surrogate/surrogate_{}".format(path, train_steps))
 
-    # @tf.function
+    @tf.function
     def train_step(self, inp, targ, targ_surrogate):
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
@@ -117,10 +117,11 @@ class NeoOriginal:
                         predictions, axis=1, output_type=tf.dtypes.int32)
                     token = tf.expand_dims(pred_token, 1)
             # vae_loss = 0
-            # scaling_factor = 1 - (self.epoch + 1) / self.epochs
-            # vae_loss *= scaling_factor
+            # scaling_factor = min(1, (self.epoch + 1) / (self.epochs / 10))
+            scaling_factor = self.sigmoid(self.epoch, center=self.epochs/10, squash=100)
+            vae_loss *= scaling_factor
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
-            # loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
+            loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
             # loss = -tf.reduce_mean(0*autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
 
         # ae_loss_per_token = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
@@ -159,6 +160,9 @@ class NeoOriginal:
         return tf.reduce_sum(
             -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
             axis=raxis)
+
+    def sigmoid(self, x, center=0, squash=1):
+        return 1.0 / (1 + np.exp(-(x-center) / squash))
 
     def kl_loss(self, mean, logvar):
         kl_loss = -0.5 * tf.reduce_mean(1 + logvar - mean ** 2 - tf.exp(logvar))
