@@ -121,7 +121,7 @@ class NeoOriginal:
             scaling_factor = self.sigmoid(self.epoch, center=self.epochs/10, squash=100)
             vae_loss *= scaling_factor
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
-            loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
+            # loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
             # loss = -tf.reduce_mean(0*autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
 
         # ae_loss_per_token = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
@@ -161,7 +161,7 @@ class NeoOriginal:
             -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
             axis=raxis)
 
-    def sigmoid(self, x, center=0, squash=1):
+    def sigmoid(self, x, center=0., squash=1.):
         return 1.0 / (1 + np.exp(-(x-center) / squash))
 
     def kl_loss(self, mean, logvar):
