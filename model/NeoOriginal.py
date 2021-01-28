@@ -51,6 +51,7 @@ class NeoOriginal:
         self.optimizer = tf.keras.optimizers.Adam(lr=1e-3)
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
             from_logits=True, reduction='none')
+        self.surrogate_object = tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction='none')
         self.save_path = ""
 
     def save_models(self):
@@ -101,8 +102,10 @@ class NeoOriginal:
             # context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
 
             token = tf.expand_dims([1] * len(inp), 1)
+            unk_token = tf.expand_dims([15] * len(inp), 1)
             latent = tf.expand_dims(latent, axis=1)
 
+            keep_prob = 1 - 0.8 * self.sigmoid(self.epoch, center=self.epochs/5, squash=self.epochs/50)
             for t in range(1, self.max_size):
                 predictions, states = self.dec(token, latent, states)
                 autoencoder_loss += self.autoencoder_loss_function(
@@ -115,9 +118,11 @@ class NeoOriginal:
                     pred_token = tf.argmax(
                         predictions, axis=1, output_type=tf.dtypes.int32)
                     token = tf.expand_dims(pred_token, 1)
+                if tf.random.uniform(shape=[]) > keep_prob:
+                    token = unk_token
             # vae_loss = 0
             # scaling_factor = min(1, (self.epoch + 1) / (self.epochs / 10))
-            scaling_factor = self.sigmoid(self.epoch, center=self.epochs/10, squash=100)
+            scaling_factor = self.sigmoid(self.epoch, center=self.epochs/5, squash=self.epochs/50)
             vae_loss *= scaling_factor
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
             # loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
@@ -160,7 +165,7 @@ class NeoOriginal:
             -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
             axis=raxis)
 
-    def sigmoid(self, x, center=0, squash=1):
+    def sigmoid(self, x, center=0., squash=1.):
         return 1.0 / (1 + np.exp(-(x-center) / squash))
 
     def kl_loss(self, mean, logvar):
@@ -184,6 +189,7 @@ class NeoOriginal:
 
     def surrogate_loss_function(self, real, pred):
         loss_ = tf.keras.losses.mean_squared_error(real, pred)
+        # loss_ = self.surrogate_object(real, pred)
         return tf.reduce_mean(loss_)
 
     def __train(self):
@@ -211,7 +217,7 @@ class NeoOriginal:
                     print(f'Epoch {epoch + 1} Batch {batch} '
                           f'Loss {batch_loss.numpy():.4f}')
 
-            if self.verbose and ((epoch + 1) % 100 == 0 or epoch == 0):
+            if self.verbose and ((epoch + 1) % 10 == 0 or epoch == 0):
                 epoch_loss = total_loss / self.population.steps_per_epoch
                 ae_loss = total_ae_loss / self.population.steps_per_epoch
                 vae_loss = total_vae_loss / self.population.steps_per_epoch
@@ -331,7 +337,7 @@ class NeoOriginal:
         self.enc.eval()
         self.dec.eval()
         data_generator = self.population(
-            batch_size=len(self.population.samples))
+            batch_size=1000)
 
         tokenized_pop = []
         for (batch, (inp, _, _)) in enumerate(data_generator):

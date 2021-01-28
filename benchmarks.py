@@ -73,7 +73,7 @@ class Par:
             value = i
             dividor = self.total_size
             parity = 1
-            for j in range(self.fanin_m ):
+            for j in range(self.fanin_m):
                 dividor /= 2
                 if value >= dividor:
                     inputs[i][j] = 1
@@ -126,6 +126,7 @@ class Maj:
             raise ValueError("num_in has to be bigger than 0")
         self.pset = pset
         self.num_in = num_in
+        self.l = []
         self.total_size = 2 ** self.num_in
         self.inputs = list(product([0, 1], repeat=self.num_in))
         self._create_outputs()
@@ -137,6 +138,15 @@ class Maj:
     def __call__(self, individual):
         func = gp.compile(individual, self.pset)
         return sum(func(*in_) == out for in_, out in zip(self.inputs, self.outputs)) / self.total_size,
+
+class MajSemantic(Maj):
+
+    def __init__(self, pset, num_in=6):
+        super().__init__(pset, num_in)
+
+    def __call__(self, individual):
+        func = gp.compile(individual, self.pset)
+        return [func(*in_) == out for in_, out in zip(self.inputs, self.outputs)]
 
 
 def nand(a, b):

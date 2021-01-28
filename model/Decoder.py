@@ -9,7 +9,7 @@ class Decoder(tf.keras.Model):
         self.dec_units = dec_units
         self.embedding_dim = embedding_dim
         self.vocab_tar_size = vocab_tar_size
-        self.embedding = tf.keras.layers.Embedding(vocab_inp_size,
+        self.embedding = tf.keras.layers.Embedding(vocab_inp_size+1,
                                                    embedding_dim)
         # self.lstm1 = tf.keras.layers.LSTM(self.dec_units,
         #                                  return_sequences=True,
@@ -26,7 +26,7 @@ class Decoder(tf.keras.Model):
 
         self.out = tf.keras.layers.Dense(vocab_tar_size)
 
-    def __call__(self, token, latent, states):
+    def __call__(self, token, latent, states, keep_prob=1.0):
         mask = tf.cast(token, dtype=bool)
 
         x = self.embedding(token)

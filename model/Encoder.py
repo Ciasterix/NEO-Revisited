@@ -35,7 +35,6 @@ class Encoder(tf.keras.Model):
             return latent, mean, logvar
         else:
             return latent, mean, logvar
-            # return latent
 
     def _reparameterize(self, mean, logvar):
         eps = tf.random.normal(shape=mean.shape)

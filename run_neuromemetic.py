@@ -43,6 +43,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     for ind, fit in zip(invalid_ind, fitnesses):
         ind.fitness.values = fit
 
+
     if halloffame is not None:
         halloffame.update(population)
 
@@ -51,24 +52,25 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
     if verbose:
         log_stream = logbook.stream
         print(log_stream)
-        save_log(log_stream, "logs/vae.log")
+        save_log(log_stream, "logs/vae_tmp.log")
 
-    save_population(population, f"offsprings/0_pop_start.txt")
+    # save_population(population, f"offsprings/0_pop_start.txt")
 
-    model_name = "2021-01-26_14:37:11.684085"
-    model.load_models(model_name, 0)
+    # model_name = "2021-01-28_15:05:51.292065"
+    # model.load_models(model_name, 0)
 
+    # save_population(population, f"offsprings/0_pop_start.txt")
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # max((epochs - 1, 10))
         # Select the next generation individuals
-        # offspring = toolbox.select(population, len(population))
-        offspring = population
-        save_population(offspring, f"offsprings/sel_{gen}.txt")
+        # offspring = population
+        offspring = toolbox.select(population, len(population))
+        # save_population(offspring, f"offsprings/sel_{gen}.txt")
         model.population.update(offspring, gen)
 
         # Training neural model
-        # model.update()
+        model.update()
 
         # Breeding neural model
         offspring = model.breed()
@@ -98,7 +100,7 @@ def memetic_algorithm(population, toolbox, ngen, model, stats=None,
         if verbose:
             log_stream = logbook.stream
             print(log_stream)
-            save_log(log_stream, "logs/vae.log")
+            save_log(log_stream, "logs/vae_tmp.log")
 
         if halloffame[0].fitness.getValues()[0] == 1:
             break
@@ -125,16 +127,16 @@ if __name__ == "__main__":
     stats = benchmarks.standard_statistics()
     neural_model = NeoOriginal(
         pset,
-        batch_size=64,
+        batch_size=256,
         max_size=40,
         vocab_inp_size=15,
         vocab_tar_size=15,
         embedding_dim=64,
-        units=256,
+        units=128,
         hidden_size=256,
         alpha=0.8,
-        epochs=5000,
-        epoch_decay=5000,
+        epochs=200,
+        epoch_decay=10,
         min_epochs=0,
         verbose=True
     )
