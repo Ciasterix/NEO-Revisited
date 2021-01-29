@@ -7,9 +7,11 @@ from model.Encoder import Encoder
 class Surrogate(tf.keras.Model):
     def __init__(self, hidden_size):
         super(Surrogate, self).__init__()
-        self.fc1 = tf.keras.layers.Dense(hidden_size, activation="relu")
-        self.fc2 = tf.keras.layers.Dense(hidden_size, activation="relu")
-        self.fc3 = tf.keras.layers.Dense(hidden_size, activation="relu")
+        self.lstm1 = tf.keras.layers.LSTM(hidden_size, return_sequences=True)
+        self.lstm2 = tf.keras.layers.LSTM(hidden_size)
+        # self.fc1 = tf.keras.layers.Dense(hidden_size, activation="relu")
+        # self.fc2 = tf.keras.layers.Dense(hidden_size, activation="relu")
+        # self.fc3 = tf.keras.layers.Dense(hidden_size, activation="relu")
         self.out = tf.keras.layers.Dense(64, activation="sigmoid")
 
         self.attention = Attention()
@@ -17,9 +19,11 @@ class Surrogate(tf.keras.Model):
         self.optimizer = tf.keras.optimizers.Adam()
 
     def __call__(self, hidden_state):
-        x = self.fc1(hidden_state)
-        x = self.fc2(x)
-        x = self.fc3(x)
+        # x = self.fc1(hidden_state)
+        # x = self.fc2(x)
+        # x = self.fc3(x)
+        x = self.lstm1(hidden_state)
+        x = self.lstm2(x)
         x = self.out(x)
         return x
 

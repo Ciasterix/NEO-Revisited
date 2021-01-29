@@ -86,8 +86,8 @@ class NeoOriginal:
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
             latent, mean, logvar = self.enc(inp)
-            logpz = self.log_normal_pdf(latent, 0., 0.)
-            logqz_x = self.log_normal_pdf(latent, mean, logvar)
+            logpz = self.log_normal_pdf(latent[:, -1], 0., 0.)
+            logqz_x = self.log_normal_pdf(latent[:, -1], mean[:, -1], logvar[:, -1])
             vae_loss = logpz - logqz_x
 
             surrogate_output = self.surrogate(mean)
@@ -103,7 +103,7 @@ class NeoOriginal:
 
             token = tf.expand_dims([1] * len(inp), 1)
             unk_token = tf.expand_dims([15] * len(inp), 1)
-            latent = tf.expand_dims(latent, axis=1)
+            latent = tf.expand_dims(latent[:, -1], axis=1)
 
             keep_prob = 1 - 0.8 * self.sigmoid(self.epoch, center=self.epochs/5, squash=self.epochs/50)
             for t in range(1, self.max_size):
@@ -124,6 +124,7 @@ class NeoOriginal:
             # scaling_factor = min(1, (self.epoch + 1) / (self.epochs / 10))
             scaling_factor = self.sigmoid(self.epoch, center=self.epochs/5, squash=self.epochs/50)
             vae_loss *= scaling_factor
+            # print(autoencoder_loss.shape, vae_loss.shape)
             loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
             # loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
             # loss = -tf.reduce_mean(0*autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
@@ -275,7 +276,7 @@ class NeoOriginal:
         dec_cell = self.dec.initialize_cell_state(len(latent))
 
         token = tf.expand_dims([1] * len(latent), 1)
-        latent = tf.expand_dims(latent, axis=1)
+        latent = tf.expand_dims(latent[:, -1], axis=1)
 
         child = token
         states = [dec_hidden, dec_cell]

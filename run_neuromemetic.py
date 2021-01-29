@@ -137,7 +137,7 @@ if __name__ == "__main__":
         alpha=0.8,
         epochs=200,
         epoch_decay=10,
-        min_epochs=0,
+        min_epochs=10,
         verbose=True
     )
     memetic_algorithm(pop, toolbox, NUM_GEN, neural_model, stats, hof)

@@ -22,7 +22,6 @@ class Population:
         # print(batch_size)
         while i < self.steps_per_epoch:
             i += 1
-            batch_size = 4
             idx = (i - 1) * batch_size
             n_idx = i * batch_size
             input_batch = tf.constant(self.samples[idx:n_idx])
