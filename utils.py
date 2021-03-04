@@ -51,7 +51,7 @@ class TreeTokenizer:
                 "First token is not '<start>' but " + tokens_names[0])
 
         for tn in tokens_names[1:]:
-            if tn == '<end>':
+            if tn == '<end>' or tn == '<pad>':
                 break
             elif tn in self.terminals:
                 expr.append(self.terminals[tn])
@@ -64,6 +64,53 @@ class TreeTokenizer:
     def validate_expression(self, tokens, expr):
         return len(tokens) == len(self._tokenize(expr))
 
+
+if __name__ == "__main__":
+    import benchmarks
+    from deap import gp
+
+    pset = benchmarks.standard_boolean_pset(num_in=6)
+    tokenizer = TreeTokenizer(pset, 100)
+    print("Setup tokenizer:")
+    print("tokens2id:")
+    print(tokenizer.tokens2id)
+    print("id2tokens:")
+    print(tokenizer.id2tokens)
+
+    s2 = 'nand(nand(IN3, IN1), or_(nand(and_(IN2, IN0), ' \
+         + 'or_(IN2, IN3)), nand(IN4, nand(IN5, 0))))'
+
+    print("\nTokenizing string")
+    print(s2)
+    print("Tokens names:")
+    print(tokenizer._tokenize(s2))
+    print("Tokens ids:")
+    tokens = tokenizer.tokenize_tree(s2)
+    print(tokens)
+
+    print("\nnReproducing Tree")
+    expr = tokenizer.reproduce_expression(tokens)
+    print("Expression")
+    print(expr)
+    print("Tree:")
+    tree = gp.PrimitiveTree(expr)
+    print(str(tree))
+
+    print("\nValidate expression:")
+    print(tokenizer.validate_expression(tokens, str(tree)))
+
+    print("\n--------------- INVALID EXAMPLE -----------")
+    invalid_tokens = tokens[1:]
+
+    print("\nnReproducing Invalid Tree")
+    invalid_expr = tokenizer.reproduce_expression(invalid_tokens)
+    print("Expression")
+    print(invalid_expr)
+    print("Tree:")
+    invalid_tree = gp.PrimitiveTree(invalid_expr)
+    print(str(invalid_tree))
+    print("Validate invalid expression:")
+    print(tokenizer.validate_expression(invalid_tokens, str(invalid_tree)))
 
 """
 Queue ADT: ArrayQueue
@@ -311,51 +358,3 @@ def create_expression_tree(prefix_exp_str):
     tree = LinkedBinaryTree(create_expression_tree_helper(expr_lst, -1)[0])
 
     return tree
-
-
-if __name__ == "__main__":
-    import benchmarks
-    from deap import gp
-
-    pset = benchmarks.standard_boolean_pset(num_in=6)
-    tokenizer = TreeTokenizer(pset, 100)
-    print("Setup tokenizer:")
-    print("tokens2id:")
-    print(tokenizer.tokens2id)
-    print("id2tokens:")
-    print(tokenizer.id2tokens)
-
-    s2 = 'nand(nand(IN3, IN1), or_(nand(and_(IN2, IN0), ' \
-         + 'or_(IN2, IN3)), nand(IN4, nand(IN5, 0))))'
-
-    print("\nTokenizing string")
-    print(s2)
-    print("Tokens names:")
-    print(tokenizer._tokenize(s2))
-    print("Tokens ids:")
-    tokens = tokenizer.tokenize_tree(s2)
-    print(tokens)
-
-    print("\nnReproducing Tree")
-    expr = tokenizer.reproduce_expression(tokens)
-    print("Expression")
-    print(expr)
-    print("Tree:")
-    tree = gp.PrimitiveTree(expr)
-    print(str(tree))
-
-    print("\nValidate expression:")
-    print(tokenizer.validate_expression(tokens, str(tree)))
-
-    print("\n--------------- INVALID EXAMPLE -----------")
-    invalid_tokens = tokens[1:]
-
-    print("\nnReproducing Invalid Tree")
-    invalid_expr = tokenizer.reproduce_expression(invalid_tokens)
-    print("Expression")
-    print(invalid_expr)
-    print("Tree:")
-    invalid_tree = gp.PrimitiveTree(invalid_expr)
-    print(str(invalid_tree))
-    print("Validate invalid expression:")
-    print(tokenizer.validate_expression(invalid_tokens, str(invalid_tree)))

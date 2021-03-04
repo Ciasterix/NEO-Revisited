@@ -1,3 +1,5 @@
+import datetime
+import os
 import time
 
 import deap
@@ -46,75 +48,98 @@ class NeoOriginal:
         self.population = Population(pset, max_size, batch_size)
         self.prob = 0.5
 
-        self.optimizer = tf.keras.optimizers.Adam()
+        self.optimizer = tf.keras.optimizers.Adam(lr=1e-3)
         self.loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=False, reduction='none')
+            from_logits=True, reduction='none')
+        self.surrogate_object = tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction='none')
+        self.save_path = ""
 
     def save_models(self):
+        if self.save_path == "":
+            timestamp = "_".join(str(datetime.datetime.now()).split())
+            self.save_path = "model/weights/{}".format(timestamp)
+            os.mkdir(self.save_path)
+            os.mkdir("{}/encoder".format(self.save_path))
+            os.mkdir("{}/decoder".format(self.save_path))
+            os.mkdir("{}/surrogate".format(self.save_path))
         self.enc.save_weights(
-            "model/weights/encoder/enc_{}".format(self.train_steps),
+            "{}/encoder/enc_{}".format(self.save_path, self.train_steps),
             save_format="tf")
         self.dec.save_weights(
-            "model/weights/decoder/dec_{}".format(self.train_steps),
+            "{}/decoder/dec_{}".format(self.save_path, self.train_steps),
             save_format="tf")
         self.surrogate.save_weights(
-            "model/weights/surrogate/surrogate_{}".format(self.train_steps),
+            "{}/surrogate/surrogate_{}".format(self.save_path, self.train_steps),
             save_format="tf")
 
-    def load_models(self, train_steps):
+    def load_models(self, path, train_steps):
+        path = "model/weights/{}".format(path)
         self.enc.load_weights(
-            "model/weights/encoder/enc_{}".format(train_steps))
+            "{}/encoder/enc_{}".format(path, train_steps))
         self.dec.load_weights(
-            "model/weights/decoder/dec_{}".format(train_steps))
+            "{}/decoder/dec_{}".format(path, train_steps))
         self.surrogate.load_weights(
-            "model/weights/surrogate/surrogate_{}".format(train_steps))
+            "{}/surrogate/surrogate_{}".format(path, train_steps))
 
     @tf.function
-    def train_step(self, inp, targ, targ_surrogate, enc_hidden,
-                   enc_cell):
+    def train_step(self, inp, targ, targ_surrogate):
         autoencoder_loss = 0
         with tf.GradientTape(persistent=True) as tape:
-            enc_output, enc_hidden, enc_cell = self.enc(
-                inp, [enc_hidden, enc_cell])
+            latent, mean, logvar = self.enc(inp)
+            logpz = self.log_normal_pdf(latent, 0., 0.)
+            logqz_x = self.log_normal_pdf(latent, mean, logvar)
+            vae_loss = logpz - logqz_x
 
-            surrogate_output = self.surrogate(enc_hidden)
+            surrogate_output = self.surrogate(mean)
             surrogate_loss = self.surrogate_loss_function(targ_surrogate,
                                                           surrogate_output)
 
-            dec_hidden = enc_hidden
-            dec_cell = enc_cell
-            context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
+            # dec_hidden = enc_hidden
+            # dec_cell = enc_cell
+            dec_hidden = self.dec.initialize_hidden_state(len(inp))
+            dec_cell = self.dec.initialize_cell_state(len(inp))
+            states = [dec_hidden, dec_cell]
+            # context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
 
-            dec_input = tf.expand_dims([1] * len(inp), 1)
+            token = tf.expand_dims([1] * len(inp), 1)
+            unk_token = tf.expand_dims([15] * len(inp), 1)
+            latent = tf.expand_dims(latent, axis=1)
 
+            keep_prob = 1 - 0.8 * self.sigmoid(self.epoch, center=self.epochs/5, squash=self.epochs/50)
             for t in range(1, self.max_size):
-                initial_state = [dec_hidden, dec_cell]
-                predictions, context, [dec_hidden, dec_cell], _ = self.dec(
-                    dec_input, context, enc_output, initial_state)
+                predictions, states = self.dec(token, latent, states)
                 autoencoder_loss += self.autoencoder_loss_function(
                     targ[:, t], predictions)
-
                 # Probabilistic teacher forcing
                 # (feeding the target as the next input)
-                if tf.random.uniform(
-                        shape=[], maxval=1, dtype=tf.float32) > self.prob:
-                    dec_input = tf.expand_dims(targ[:, t], 1)
+                if tf.random.uniform(shape=[]) > self.prob:
+                    token = tf.expand_dims(targ[:, t], 1)
                 else:
                     pred_token = tf.argmax(
                         predictions, axis=1, output_type=tf.dtypes.int32)
-                    dec_input = tf.expand_dims(pred_token, 1)
+                    token = tf.expand_dims(pred_token, 1)
+                if tf.random.uniform(shape=[]) > keep_prob:
+                    token = unk_token
+            # vae_loss = 0
+            # scaling_factor = min(1, (self.epoch + 1) / (self.epochs / 10))
+            scaling_factor = self.sigmoid(self.epoch, center=self.epochs/5, squash=self.epochs/50)
+            vae_loss *= scaling_factor
+            loss = -tf.reduce_mean(-autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
+            # loss = -tf.reduce_mean(-autoencoder_loss) + self.alpha * surrogate_loss
+            # loss = -tf.reduce_mean(0*autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
 
-            loss = autoencoder_loss + self.alpha * surrogate_loss
-
-        ae_loss_per_token = autoencoder_loss / int(targ.shape[1])
-        batch_loss = ae_loss_per_token + self.alpha * surrogate_loss
-        batch_ae_loss = (autoencoder_loss / int(targ.shape[1]))
+        # ae_loss_per_token = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
+        batch_loss = loss
+        # batch_loss = -tf.reduce_mean(autoencoder_loss + vae_loss) + self.alpha * surrogate_loss
+        batch_ae_loss = tf.reduce_mean(autoencoder_loss) / int(targ.shape[1])
+        batch_vae_loss = -tf.reduce_mean(vae_loss)
         batch_surrogate_loss = surrogate_loss
 
         gradients, variables = self.backward(loss, tape)
+        # gradients = [tf.clip_by_norm(g, 1.0) for g in gradients]
         self.optimize(gradients, variables)
-
-        return batch_loss, batch_ae_loss, batch_surrogate_loss
+        # print(batch_loss.shape, batch_ae_loss.shape, batch_vae_loss.shape, batch_surrogate_loss.shape)
+        return batch_loss, batch_ae_loss, batch_vae_loss, batch_surrogate_loss
 
     def backward(self, loss, tape):
         variables = \
@@ -134,15 +159,37 @@ class NeoOriginal:
         latent += eta * gradients
         return latent
 
+    def log_normal_pdf(self, sample, mean, logvar, raxis=1):
+        log2pi = tf.math.log(2. * np.pi)
+        return tf.reduce_sum(
+            -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
+            axis=raxis)
+
+    def sigmoid(self, x, center=0., squash=1.):
+        return 1.0 / (1 + np.exp(-(x-center) / squash))
+
+    def kl_loss(self, mean, logvar):
+        kl_loss = -0.5 * tf.reduce_mean(1 + logvar - mean ** 2 - tf.exp(logvar))
+
+        # sigma_sq_enc = tf.square(tf.exp(logvar))
+        # kl_loss = -.5 * tf.reduce_mean(tf.reduce_sum(
+        #     (1 + tf.math.log(1e-10 + sigma_sq_enc)) - tf.square(
+        #         mean) - sigma_sq_enc, axis=1), axis=0)
+        return kl_loss
+
     def autoencoder_loss_function(self, real, pred):
         mask = tf.math.logical_not(tf.math.equal(real, 0))
         loss_ = self.loss_object(real, pred)
+        # loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred)
         mask = tf.cast(mask, dtype=loss_.dtype)
-        loss_ *= mask
-        return tf.reduce_mean(loss_)
+        # loss_ *= mask
+        # loss_1 *= mask
+        # return tf.reduce_mean(loss_)
+        return loss_
 
     def surrogate_loss_function(self, real, pred):
         loss_ = tf.keras.losses.mean_squared_error(real, pred)
+        # loss_ = self.surrogate_object(real, pred)
         return tf.reduce_mean(loss_)
 
     def __train(self):
@@ -153,17 +200,17 @@ class NeoOriginal:
 
             total_loss = 0
             total_ae_loss = 0
+            total_vae_loss = 0
             total_surrogate_loss = 0
 
             data_generator = self.population()
             for (batch, (inp, targ, targ_surrogate)) in enumerate(
                     data_generator):
-                enc_hidden = self.enc.initialize_hidden_state(batch_sz=len(inp))
-                enc_cell = self.enc.initialize_cell_state(batch_sz=len(inp))
-                batch_loss, batch_ae_loss, batch_surr_loss = self.train_step(
-                    inp, targ, targ_surrogate, enc_hidden, enc_cell)
+                batch_loss, batch_ae_loss, batch_vae_loss, batch_surr_loss = self.train_step(
+                    inp, targ, targ_surrogate)
                 total_loss += batch_loss
                 total_ae_loss += batch_ae_loss
+                total_vae_loss += batch_vae_loss
                 total_surrogate_loss += batch_surr_loss
 
                 if False and self.verbose:
@@ -173,27 +220,27 @@ class NeoOriginal:
             if self.verbose and ((epoch + 1) % 10 == 0 or epoch == 0):
                 epoch_loss = total_loss / self.population.steps_per_epoch
                 ae_loss = total_ae_loss / self.population.steps_per_epoch
+                vae_loss = total_vae_loss / self.population.steps_per_epoch
                 surrogate_loss = \
                     total_surrogate_loss / self.population.steps_per_epoch
                 epoch_time = time.time() - start
                 print(f'Epoch {epoch + 1} Loss {epoch_loss:.6f} AE_loss '
-                      f'{ae_loss:.6f} Surrogate_loss '
+                      f'{ae_loss:.6f} VAE_loss '
+                      f'{vae_loss:.6f} Surrogate_loss '
                       f'{surrogate_loss:.6f} Time: {epoch_time:.3f}')
 
         # decrease number of epochs, but don't go below self.min_epochs
         self.epochs = max(self.epochs - self.epoch_decay, self.min_epochs)
 
     def _gen_children(
-            self, candidates, enc_output, enc_hidden, enc_cell, max_eta=1000):
+            self, candidates, latent, max_eta=1000):
         children = []
         eta = 0
-        enc_mask = enc_output._keras_mask
         last_copy_ind = len(candidates)
         while eta < max_eta:
             eta += 1
             start = time.time()
-            new_children = self._gen_decoded(
-                eta, enc_output, enc_hidden, enc_cell, enc_mask).numpy()
+            new_children = self._gen_decoded(eta, latent).numpy()
             new_children = self.cut_seq(new_children, end_token=2)
             new_ind, copy_ind = self.find_new(new_children, candidates)
             if len(copy_ind) < last_copy_ind:
@@ -204,10 +251,9 @@ class NeoOriginal:
                 children.append(new_children[i])
             if len(copy_ind) < 1:
                 break
-            enc_output = tf.gather(enc_output, copy_ind)
-            enc_mask = tf.gather(enc_mask, copy_ind)
-            enc_hidden = tf.gather(enc_hidden, copy_ind)
-            enc_cell = tf.gather(enc_cell, copy_ind)
+            latent = tf.gather(latent, copy_ind)
+            # enc_cell = tf.gather(enc_cell, copy_ind)
+            # enc_states = [enc_hidden, enc_cell]
             candidates = tf.gather(candidates, copy_ind)
         if eta == max_eta:
             print("Maximal value of eta reached - breed stopped")
@@ -215,34 +261,38 @@ class NeoOriginal:
             children.append(new_children[i])
         return children
 
-    def _gen_decoded(self, eta, enc_output, enc_hidden, enc_cell, enc_mask):
+    def _gen_decoded(self, eta, latent):
+        # enc_hidden, enc_cell = enc_states
         with tf.GradientTape(
                 persistent=True, watch_accessed_variables=False) as tape:
-            tape.watch(enc_hidden)
-            surrogate_output = self.surrogate(enc_hidden)
-        gradients = self.surrogate_breed(surrogate_output, enc_hidden,
+            tape.watch(latent)
+            surrogate_output = self.surrogate(latent)
+        gradients = self.surrogate_breed(surrogate_output, latent,
                                          tape)
-        dec_hidden = self.update_latent(enc_hidden, gradients, eta=eta)
-        dec_cell = enc_cell
-        context = tf.zeros(shape=[len(dec_hidden), 1, dec_hidden.shape[1]])
+        latent = self.update_latent(latent, gradients, eta=eta)
 
-        dec_input = tf.expand_dims([1] * len(enc_hidden), 1)
+        dec_hidden = self.dec.initialize_hidden_state(len(latent))
+        dec_cell = self.dec.initialize_cell_state(len(latent))
 
-        child = dec_input
+        token = tf.expand_dims([1] * len(latent), 1)
+        latent = tf.expand_dims(latent, axis=1)
+
+        child = token
+        states = [dec_hidden, dec_cell]
         for _ in range(1, self.max_size - 1):
-            initial_state = [dec_hidden, dec_cell]
-            predictions, context, [dec_hidden, dec_cell], _ = self.dec(
-                dec_input, context, enc_output, initial_state, enc_mask)
-            dec_input = tf.expand_dims(
+            predictions, states = self.dec(token, latent, states)
+            token = tf.expand_dims(
                 tf.argmax(predictions, axis=1, output_type=tf.dtypes.int32), 1)
-            child = tf.concat([child, dec_input], axis=1)
-        stop_tokens = tf.expand_dims([2] * len(enc_hidden), 1)
+            child = tf.concat([child, token], axis=1)
+        stop_tokens = tf.expand_dims([2] * len(latent), 1)
         child = tf.concat([child,
                            stop_tokens], axis=1)
         return child
 
-    def cut_seq(self, seq, end_token=2):
-        ind = (seq == end_token).argmax(1)
+    def cut_seq(self, seq, end_token=2, pad_token=0):
+        end_token_ind = (seq == end_token).argmax(1)
+        pad_token_ind = (seq == pad_token).argmax(1)
+        ind = np.minimum(end_token_ind, pad_token_ind)
         res = []
         tree_max = []
         for d, i in zip(seq, ind):
@@ -270,12 +320,9 @@ class NeoOriginal:
                 copy_ind.append(i)
         return new_ind, copy_ind
 
-    def _gen_latent(self, candidates):
-        enc_hidden = self.enc.initialize_hidden_state(batch_sz=len(candidates))
-        enc_cell = self.enc.initialize_cell_state(batch_sz=len(candidates))
-        enc_output, enc_hidden, enc_cell = self.enc(candidates,
-                                                    [enc_hidden, enc_cell])
-        return enc_output, enc_hidden, enc_cell
+    def _gen_latents(self, candidates):
+        latents, mean, logvar = self.enc(candidates)
+        return mean
 
     def update(self):
         print("Training")
@@ -287,16 +334,17 @@ class NeoOriginal:
 
     def breed(self):
         print("Breed")
+        self.enc.eval()
         self.dec.eval()
         data_generator = self.population(
-            batch_size=len(self.population.samples))
+            batch_size=1000)
 
         tokenized_pop = []
         for (batch, (inp, _, _)) in enumerate(data_generator):
-            enc_output, enc_hidden, enc_cell = self._gen_latent(inp)
+            latent = self._gen_latents(inp)
 
             tokenized_pop += (
-                self._gen_children(inp, enc_output, enc_hidden, enc_cell))
+                self._gen_children(inp, latent))
 
         pop_expressions = [
             self.population.tokenizer.reproduce_expression(tp)
